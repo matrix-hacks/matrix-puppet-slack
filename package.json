@@ -1,0 +1,19 @@
+{
+  "name": "matrix-appservice-slack",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@slack/client": "^3.8.1",
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "passport": "^0.3.2",
+    "passport-slack": "0.0.7"
+  }
+}

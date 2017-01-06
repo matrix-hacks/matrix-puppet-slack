@@ -1,0 +1,7 @@
+{
+  "slack": {
+    "user_access_token": "<set automatically through oauth>",
+    "app_client_id": "<your app client id>",
+    "app_secret": "<your app secret>"
+  }
+}
