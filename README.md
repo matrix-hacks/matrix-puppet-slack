@@ -10,16 +10,6 @@ The client then uses that access token to connect as a client using the slack RT
 
 This technique does not require admin on the slack team; instead, the bridge is simply a custom slack client.
 
-**DO NOT USE THIS YET, WORK IN PROGRESS**
-
-## Alternatives
-
-Here's the official slack bridge, which works completely differently, requiring admin privileges in order to setup various webhooks:
-
-* https://github.com/matrix-org/matrix-appservice-slack
-
----
-
 ## installation
 
 clone this repo
@@ -49,3 +39,10 @@ Edit your homeserver.yaml file and update the `app_service_config_files` with th
 Launch the bridge with ```node index.js```.
 
 Restart your HS.
+
+## Alternatives
+
+Here's the official slack bridge, which works completely differently, requiring admin privileges in order to setup various webhooks:
+
+* https://github.com/matrix-org/matrix-appservice-slack
+
