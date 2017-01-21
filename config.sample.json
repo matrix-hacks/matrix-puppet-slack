@@ -1,7 +1,14 @@
 {
   "slack": {
-    "user_access_token": "<set automatically through oauth>",
-    "app_client_id": "<your app client id>",
-    "app_secret": "<your app secret>"
+    "team_name": "<slack team name>",
+    "user_access_token": "<slack 'test' token>"
+  },
+  "registrationPath": "slack-<team name>-registration.yaml",
+  "port": 8092,
+  "bridge": {
+    "homeserverUrl":"https://synapse.keyvan.pw",
+    "domain": "synapse.keyvan.pw",
+    "registration": "slack-<team name>-registration.yaml"
   }
 }
+

@@ -1,6 +1,3 @@
-const { fork } = require('child_process');
-const config = require('./config.json');
-
 const {
   MatrixAppServiceBridge: {
     Cli, AppServiceRegistration
@@ -8,39 +5,42 @@ const {
   Puppet,
   MatrixPuppetBridgeBase
 } = require("matrix-puppet-bridge");
-const FacebookClient = require('./client');
-const config = require('./config.json');
+const SlackClient = require('./client');
 const path = require('path');
-const puppet = new Puppet(path.join(__dirname, './config.json' ));
-const debug = require('debug')('matrix-puppet:facebook');
+const config = require('./config.json');
+const puppet = new Puppet('./config.json');
+const debug = require('debug')('matrix-puppet:slack');
 
 class App extends MatrixPuppetBridgeBase {
   getServicePrefix() {
-    return "slack";
+    return `slack_${config.slack.team_name}`;
   }
   initThirdPartyClient() {
-    this.thirdPartyClient = new FacebookClient(this.config.facebook);
-    this.thirdPartyClient.on('message', (data)=>{
-      const { senderID, body, threadID, isGroup } = data;
-      const isMe = senderID === this.thirdPartyClient.userId;
-      console.log("ISME?", isMe);
-      this.threadInfo[threadID] = { isGroup };
+    this.client = new SlackClient(this.config.slack.user_access_token);
+    this.client.on('message', (data)=>{
+      const { channel, user, text } = data;
+      const isMe = user === this.client.getSelfUserId();
       const payload = {
-        roomId: threadID,
-        // senderName: senderID,
-        senderId: isMe ? undefined : senderID,
-        text: body
+        roomId: channel,
+        senderName: this.client.getUserById(user).name,
+        senderId: isMe ? undefined : user,
+        text
       };
-      debug(payload);
-      return this.handleThirdPartyRoomMessage(payload);
+      return this.handleThirdPartyRoomMessage(payload).catch(err=>{
+        console.error(err.stack);
+      });
     });
-    return this.thirdPartyClient.login();
+    this.client.connect();
   }
-  getThirdPartyRoomDataById(threadId) {
-    debug('getting third party room data by thread id', threadId);
+  getThirdPartyRoomDataById(id) {
+    const channel = this.client.getChannelById(id);
+    return {
+      name: channel.name,
+      topic: channel.purpose.value // there is also channel.topic but it seems less used
+    }
   }
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
-    return this.rtm.sendMessage("text", channel);
+    return this.client.sendMessage(text, id);
   }
 }
 
@@ -48,12 +48,13 @@ new Cli({
   port: config.port,
   registrationPath: config.registrationPath,
   generateRegistration: function(reg, callback) {
+    const prefix = `slack_${config.slack.team_name}`;
     puppet.associate().then(()=>{
       reg.setId(AppServiceRegistration.generateToken());
       reg.setHomeserverToken(AppServiceRegistration.generateToken());
       reg.setAppServiceToken(AppServiceRegistration.generateToken());
-      reg.setSenderLocalpart("facebookbot");
-      reg.addRegexPattern("users", "@facebook_.*", true);
+      reg.setSenderLocalpart(`${prefix}_bot`);
+      reg.addRegexPattern("users", `@${prefix}.*`, true);
       callback(reg);
     }).catch(err=>{
       console.error(err.message);
@@ -61,7 +62,6 @@ new Cli({
     });
   },
   run: function(port) {
-    if (config.slack.user_access_token) {
       const app = new App(config, puppet);
       return puppet.startClient().then(()=>{
         return app.initThirdPartyClient();
@@ -73,12 +73,5 @@ new Cli({
         console.error(err.message);
         process.exit(-1);
       });
-    } else if (config.slack.app_client_id && config.slack.app_secret) {
-      console.log('no user token set, starting oauth server to get you one');
-      fork('oauth-server');
-    } else {
-      console.error('no user token or oauth app details found!');
-      process.exit(1);
-    }
   }
 }).run();
