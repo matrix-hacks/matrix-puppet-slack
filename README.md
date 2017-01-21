@@ -2,11 +2,11 @@
 
 This is an unofficial matrix slack bridge that works by means of [user puppetting](https://github.com/AndrewJDR/matrix-puppet-bridge).
 
-It can start a built-in server to do oauth for you (by requesting the `client` scope) and then stores that access token.
+Get your `user_access_token` from here:
 
-Once the token is acquired, you do not need to expose the bridge to the open internet anymore. This is only necessary for the oauth dance.
+https://api.slack.com/docs/oauth-test-tokens
 
-The client then uses that access token to connect as a client using the slack RTM API.
+The bridge uses that access token to connect as a client using the slack RTM API.
 
 This technique does not require admin on the slack team; instead, the bridge is simply a custom slack client.
 
@@ -21,10 +21,6 @@ run `npm install`
 ## configure
 
 Copy `config.sample.json` to `config.json` and update it to match your setup
-
-Get your `user_access_token` from here:
-
-https://api.slack.com/docs/oauth-test-tokens
 
 ## register the app service
 
