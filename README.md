@@ -10,6 +10,8 @@ The bridge uses that access token to connect as a client using the slack RTM API
 
 This technique does not require admin on the slack team; instead, the bridge is simply a custom slack client.
 
+The bridge supports multiple teams at once, see the config.sample.json
+
 ## installation
 
 clone this repo
@@ -20,7 +22,7 @@ run `npm install`
 
 ## configure
 
-Copy `config.sample.json` to `config.json` and update it to match your setup
+Copy `config.sample.json` to `config.json` and update it to match your setup. Add as many teams as you like by adding them to the array.
 
 ## register the app service
 
@@ -35,10 +37,3 @@ Edit your homeserver.yaml file and update the `app_service_config_files` with th
 Launch the bridge with ```node index.js```.
 
 Restart your HS.
-
-## Alternatives
-
-Here's the official slack bridge, which works completely differently, requiring admin privileges in order to setup various webhooks:
-
-* https://github.com/matrix-org/matrix-appservice-slack
-
