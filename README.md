@@ -26,13 +26,13 @@ Copy `config.sample.json` to `config.json` and update it to match your setup. Ad
 
 ## register the app service
 
-Generate an `slack-<team>-registration.yaml` file with `node index.js -r -u "http://your-bridge-server:8090"`
+Generate an `slack-registration.yaml` file with `node index.js -r -u "http://your-bridge-server:8090"`
 
 Note: The 'registration' setting in the config.json needs to set to the path of this file. By default, it already is.
 
-Copy this `slack-<team>-registration.yaml` file to your home server. Make sure that from the perspective of the homeserver, the url is correctly pointing to your bridge server. e.g. `url: 'http://your-bridge-server.example.org:8090'` and is reachable.
+Copy this `slack-registration.yaml` file to your home server. Make sure that from the perspective of the homeserver, the url is correctly pointing to your bridge server. e.g. `url: 'http://your-bridge-server.example.org:8090'` and is reachable.
 
-Edit your homeserver.yaml file and update the `app_service_config_files` with the path to the `slack-<team>-registration.yaml` file.
+Edit your homeserver.yaml file and update the `app_service_config_files` with the path to the `slack-registration.yaml` file.
 
 Launch the bridge with ```node index.js```.
 
