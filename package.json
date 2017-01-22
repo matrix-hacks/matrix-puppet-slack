@@ -1,5 +1,5 @@
 {
-  "name": "matrix-appservice-slack",
+  "name": "matrix-puppet-slack",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -12,9 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@slack/client": "^3.8.1",
-    "body-parser": "^1.15.2",
-    "express": "^4.14.0",
-    "passport": "^0.3.2",
-    "passport-slack": "0.0.7"
+    "bluebird": "^3.4.7",
+    "matrix-puppet-bridge": "^1.4.1"
   }
 }

@@ -2,6 +2,7 @@ const debug = require('debug')('matrix-puppet:slack:client');
 const RtmClient = require('@slack/client').RtmClient;
 const CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 const EventEmitter = require('events').EventEmitter;
+const Promise = require('bluebird');
 
 class Client extends EventEmitter {
   constructor(token) {
@@ -11,34 +12,38 @@ class Client extends EventEmitter {
     this.data = null;
   }
   connect() {
-    this.rtm = new RtmClient(this.token);
-    this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
-      console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
-      this.data = rtmStartData;
-    });
+    return new Promise((resolve, reject) => {
+      this.rtm = new RtmClient(this.token);
+      this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+        console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
+        this.data = rtmStartData;
+      });
 
-    // you need to wait for the client to fully connect before you can send messages
-    this.rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => {
-      // rtm.sendMessage("Hello!", channel);
-      debug('fully connected');
-    });
+      // you need to wait for the client to fully connect before you can send messages
+      this.rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => {
+        // rtm.sendMessage("Hello!", channel);
+        debug('fully connected');
+        resolve();
+      });
 
-    this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
-      let data = JSON.parse(payload);
-      if ( data.type === "message" ) {
-        this._emitMessage(data);
-      } else if (data.type === 'pong') {
-        // very chatty... ignore
-      } else {
-        debug('raw message, type:', data.type);
-      }
-    });
+      this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
+        let data = JSON.parse(payload);
+        if ( data.type === "message" ) {
+          debug('emitting message:', data);
+          this.emit('message', data);
+        } else if (data.type === 'channel_joined') {
+          this.data.channels.push(data.channel);
+        } else if (data.type === 'reconnect_url') {
+          // ignore
+        } else if (data.type === 'pong') {
+          // ignore
+        } else {
+          debug('raw message, type:', data.type);
+        }
+      });
 
-    this.rtm.start();
-  }
-  _emitMessage(data) {
-    debug('emitting message:', data);
-    this.emit('message', data);
+      this.rtm.start();
+    });
   }
   getSelfUserId() {
     return this.data.self.id;
