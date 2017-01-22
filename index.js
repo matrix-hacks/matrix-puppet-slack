@@ -82,14 +82,12 @@ new Cli({
       return new Promise((resolve, reject) => {
         let app = matrixRoomAppMap[room_id];
         if (app) {
-          debug('using cached mapping of matrix room id to slack team app instance');
           return resolve(app);
         } else {
           let ret = teamAppList.reduce((acc, app)=>{
             if ( acc ) return acc;
             let channel = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
             if (channel && app.client.getChannelById(channel)) {
-              debug('caching mapping of matrix room id to slack team app instance');
               matrixRoomAppMap[room_id] = app;
               return app;
             }
@@ -106,10 +104,14 @@ new Cli({
           return {}; // auto provision users w no additional data
         },
         onEvent: function(req, ctx) {
+          debug('event in');
           const { room_id } = req.getData();
           if (room_id) {
             getAndCacheAppFromMatrixRoomId(room_id).then( app => {
+              debug('got app from matrix room id');
               return app.handleMatrixEvent(req, ctx);
+            }).catch(err=>{
+              console.error(err);
             });
           }
         },
