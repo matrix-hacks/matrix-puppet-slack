@@ -76,8 +76,28 @@ new Cli({
   },
   run: function(port) {
     let teamAppList = [];
+
     let matrixRoomAppMap = {};
-    let protocols = config.slack.map(i=>`slack_${i.team_name}`);
+    const getAndCacheAppFromMatrixRoomId = (room_id) => {
+      return new Promise((resolve, reject) => {
+        let app = matrixRoomAppMap[room_id];
+        if (app) {
+          debug('using cached mapping of matrix room id to slack team app instance');
+          return resolve(app);
+        } else {
+          let ret = teamAppList.reduce((acc, app)=>{
+            if ( acc ) return acc;
+            let channel = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+            if (channel && app.client.getChannelById(channel)) {
+              debug('caching mapping of matrix room id to slack team app instance');
+              matrixRoomAppMap[room_id] = app;
+              return app;
+            }
+          });
+          return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', matrixRoomId));
+        }
+      });
+    }
 
     const bridge = new Bridge(Object.assign({}, config.bridge, {
       controller: {
@@ -87,20 +107,9 @@ new Cli({
         },
         onEvent: function(req, ctx) {
           const { room_id } = req.getData();
-          if (!room_id) return;
-
-          let app = matrixRoomAppMap[room_id];
-          if (app) {
-            debug('using cached mapping of matrix room id to slack team app instance');
-            return app.handleMatrixEvent(req, ctx);
-          } else {
-            return teamAppList.forEach(app=>{
-              let channel = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
-              if (channel && app.client.getChannelById(channel)) {
-                debug('caching mapping of matrix room id to slack team app instance');
-                matrixRoomAppMap[room_id] = app;
-                return app.handleMatrixEvent(req, ctx);
-              }
+          if (room_id) {
+            getAndCacheAppFromMatrixRoomId(room_id).then( app => {
+              return app.handleMatrixEvent(req, ctx);
             });
           }
         },
@@ -108,7 +117,7 @@ new Cli({
           console.log('on alias query');
         },
         thirdPartyLookup: {
-          protocols,
+          protocols: config.slack.map(i=>`slack_${i.team_name}`),
           getProtocol: function() {
             console.log('get proto');
           },
