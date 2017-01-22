@@ -16,6 +16,7 @@ class Client extends EventEmitter {
       this.rtm = new RtmClient(this.token);
       this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
         console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
+        //require('fs').writeFileSync(`data-${rtmStartData.team.name}.json`, JSON.stringify(rtmStartData, null, 2));
         this.data = rtmStartData;
       });
 
@@ -53,6 +54,9 @@ class Client extends EventEmitter {
   }
   getChannelById(id) {
     return this.data.channels.find(c => c.id === id);
+  }
+  getImById(id) {
+    return this.data.ims.find(c => c.id === id);
   }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);

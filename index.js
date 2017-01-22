@@ -40,9 +40,17 @@ class App extends MatrixPuppetBridgeBase {
   }
   getThirdPartyRoomDataById(id) {
     const channel = this.client.getChannelById(id);
-    return {
-      name: channel.name,
-      topic: channel.purpose.value // there is also channel.topic but it seems less used
+    if ( channel ) {
+      return {
+        name: channel.name,
+        topic: channel.purpose.value // there is also channel.topic but it seems less used
+      }
+    } else {
+      const im = this.client.getImById(id);
+      return {
+        name: this.client.getUserById(im.user).name,
+        topic: `Slack Direct Message (Team: ${this.teamName})`
+      }
     }
   }
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
