@@ -58,6 +58,21 @@ class Client extends EventEmitter {
   getImById(id) {
     return this.data.ims.find(c => c.id === id);
   }
+  // get "room" by id will check for channel or IM and hide the details of that difference
+  // but pass that detail along in case the callee cares.
+  getRoomById(id) {
+    let channel = this.getChannelById(id);
+    if ( channel ) {
+      channel.isDirect = false;
+      return channel;
+    }
+    let im = this.getImById(id);
+    if ( im ) {
+      im.isDirect = true;
+      return im;
+    }
+    return null;
+  }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);
   }

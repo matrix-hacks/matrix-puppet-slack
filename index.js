@@ -39,21 +39,15 @@ class App extends MatrixPuppetBridgeBase {
     return this.client.connect();
   }
   getThirdPartyRoomDataById(id) {
-    const channel = this.client.getChannelById(id);
-    if ( channel ) {
-      return {
-        name: channel.name,
-        topic: channel.purpose.value // there is also channel.topic but it seems less used
-      }
-    } else {
-      const im = this.client.getImById(id);
-      return {
-        name: this.client.getUserById(im.user).name,
-        topic: `Slack Direct Message (Team: ${this.teamName})`
-      }
+    const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
+    const room = this.client.getRoomById(id);
+    return {
+      name: room.name,
+      topic: room.isDirect ? directTopic() : room.purpose.value
     }
   }
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
+    debug('sending message as puppet to third party room with id', id);
     return this.client.sendMessage(text, id);
   }
 }
@@ -78,6 +72,9 @@ new Cli({
     let teamAppList = [];
 
     let matrixRoomAppMap = {};
+
+    // KINDA BAD because you might have 2 accounts that are in the same room
+    // although that would be silly, right?
     const getAndCacheAppFromMatrixRoomId = (room_id) => {
       return new Promise((resolve, reject) => {
         let app = matrixRoomAppMap[room_id];
@@ -86,12 +83,13 @@ new Cli({
         } else {
           let ret = teamAppList.reduce((acc, app)=>{
             if ( acc ) return acc;
-            let channel = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
-            if (channel && app.client.getChannelById(channel)) {
+            let slackRoomId = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+            let slackRoom = app.client.getRoomById(slackRoomId);
+            if (slackRoom) {
               matrixRoomAppMap[room_id] = app;
               return app;
             }
-          });
+          }, null);
           return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', matrixRoomId));
         }
       });
@@ -104,13 +102,14 @@ new Cli({
           return {}; // auto provision users w no additional data
         },
         onEvent: function(req, ctx) {
-          debug('event in');
           const { room_id } = req.getData();
+          debug('event in room id', room_id);
           if (room_id) {
             getAndCacheAppFromMatrixRoomId(room_id).then( app => {
               debug('got app from matrix room id');
               return app.handleMatrixEvent(req, ctx);
             }).catch(err=>{
+              debug('could not get app for matrix room id');
               console.error(err);
             });
           }
