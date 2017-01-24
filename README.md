@@ -1,4 +1,4 @@
-# matrix-appservice-slack
+# matrix-puppet-slack
 
 This is an unofficial matrix slack bridge that works by means of [user puppetting](https://github.com/AndrewJDR/matrix-puppet-bridge).
 
