@@ -23,19 +23,35 @@ class App extends MatrixPuppetBridgeBase {
   }
   initThirdPartyClient() {
     this.client = new SlackClient(this.userAccessToken);
-    this.client.on('message', (data)=>{
-      const { channel, user, text } = data;
-      const isMe = user === this.client.getSelfUserId();
-      const payload = {
-        roomId: channel,
-        senderName: this.client.getUserById(user).name,
-        senderId: isMe ? undefined : user,
-        text
-      };
-      return this.handleThirdPartyRoomMessage(payload).catch(err=>{
-        console.error(err);
+    setTimeout(() => {
+      this.client.on('message', (data)=>{
+        const { channel, user, text, attachments } = data;
+
+        // any direct text
+        let messages = [text];
+
+        // any attachments, stuff it into the text as new lines
+        if (attachments) {
+          attachments.forEach(att=>{
+            debug('adding attachment', att);
+            messages.push(att.text);
+          });
+        }
+
+        const isMe = user === this.client.getSelfUserId();
+        const payload = {
+          roomId: channel,
+          senderName: this.client.getUserById(user).name,
+          senderId: isMe ? undefined : user,
+          text: messages.join('\n').trim()
+        };
+        return this.handleThirdPartyRoomMessage(payload).catch(err=>{
+          console.error(err);
+        });
       });
-    });
+      debug('registered message listener');
+    }, 5000);
+    debug('waiting a little bit for initial self-messages to fire before listening for messages');
     return this.client.connect();
   }
   getThirdPartyRoomDataById(id) {

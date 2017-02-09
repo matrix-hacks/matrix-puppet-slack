@@ -50,7 +50,7 @@ class Client extends EventEmitter {
     return this.data.self.id;
   }
   getUserById(id) {
-    return this.data.users.find(u => u.id === id);
+    return this.data.users.find(u => u.id === id) || { name: "unknown" };
   }
   getChannelById(id) {
     return this.data.channels.find(c => c.id === id);
