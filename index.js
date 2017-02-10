@@ -11,6 +11,9 @@ const config = require('./config.json');
 const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
 const Promise = require('bluebird');
+const slackdown = require('./slackdown');
+const showdown  = require('showdown');
+const converter = new showdown.Converter();
 
 class App extends MatrixPuppetBridgeBase {
   setSlackTeam(teamName, userAccessToken) {
@@ -39,11 +42,24 @@ class App extends MatrixPuppetBridgeBase {
         }
 
         const isMe = user === this.client.getSelfUserId();
+
+        const rawMessage = messages.join('\n').trim();
+        let normalizedMessage = "";
+        let html = null;
+        try {
+          normalizedMessage = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
+          html = converter.makeHtml(normalizedMessage);
+        } catch (e) {
+          debug("could not normalize message", e);
+          normalizedMessage = rawMessage;
+        }
+
         const payload = {
           roomId: channel,
           senderName: this.client.getUserById(user).name,
           senderId: isMe ? undefined : user,
-          text: messages.join('\n').trim()
+          text: normalizedMessage,
+          html: html
         };
         return this.handleThirdPartyRoomMessage(payload).catch(err=>{
           console.error(err);

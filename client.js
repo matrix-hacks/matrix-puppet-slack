@@ -76,6 +76,12 @@ class Client extends EventEmitter {
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);
   }
+  getUsers() {
+    return this.data.users;
+  }
+  getChannels() {
+    return this.data.channels;
+  }
 }
 
 module.exports = Client;
