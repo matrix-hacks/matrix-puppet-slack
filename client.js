@@ -19,16 +19,32 @@ class Client extends EventEmitter {
   connect() {
     return new Promise((resolve, reject) => {
       this.rtm = new RtmClient(this.token);
+
+      // reject on any unrecoverable error
+      this.rtm.on(CLIENT_EVENTS.RTM.UNABLE_TO_RTM_START, (err) => {
+        this.emit('unable-to-start', err);
+        reject(err);
+      });
+
+      // disconnect is called only when there is on chance of reconnection,
+      // either due to unrecoverable errors or the disabling of reconnect
+      // so it's the best way to know to act towards reconnecting
+      // the issue here is that at this point we dont know if
+      // its an "unrecoverable error" or not, so if we were to implement
+      // reconnect ourself in respones to this event, we may start looping
+      this.rtm.on(CLIENT_EVENTS.RTM.DISCONNECT, () => {
+        this.emit('disconnected'); // can use this to announce status and issue a reconnect
+      });
+
       this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
-        console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
+        debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
         //require('fs').writeFileSync(`data-${rtmStartData.team.name}.json`, JSON.stringify(rtmStartData, null, 2));
         this.data = rtmStartData;
       });
 
       // you need to wait for the client to fully connect before you can send messages
       this.rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => {
-        // rtm.sendMessage("Hello!", channel);
-        debug('fully connected');
+        this.emit('connected'); // can use this to announce status
         resolve();
       });
 

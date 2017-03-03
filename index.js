@@ -1,88 +1,18 @@
+const path = require('path');
+const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
     Bridge, Cli, AppServiceRegistration
   },
   Puppet,
-  MatrixPuppetBridgeBase
 } = require("matrix-puppet-bridge");
-const SlackClient = require('./client');
-const path = require('path');
-const config = require('./config.json');
 const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
 const Promise = require('bluebird');
 const slackdown = require('./slackdown');
 const showdown  = require('showdown');
 const converter = new showdown.Converter();
-
-class App extends MatrixPuppetBridgeBase {
-  setSlackTeam(teamName, userAccessToken) {
-    this.teamName = teamName;
-    this.userAccessToken = userAccessToken;
-    this.servicePrefix = `slack_${this.teamName}`;
-  }
-  getServicePrefix() {
-    return this.servicePrefix;
-  }
-  initThirdPartyClient() {
-    this.client = new SlackClient(this.userAccessToken);
-    setTimeout(() => {
-      this.client.on('message', (data)=>{
-        const { channel, user, text, attachments } = data;
-
-        // any direct text
-        let messages = [text];
-
-        // any attachments, stuff it into the text as new lines
-        if (attachments) {
-          attachments.forEach(att=>{
-            debug('adding attachment', att);
-            messages.push(att.text);
-          });
-        }
-
-        const isMe = user === this.client.getSelfUserId();
-
-        const rawMessage = messages.join('\n').trim();
-        let normalizedMessage = "";
-        let html = null;
-        try {
-          normalizedMessage = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
-          html = converter.makeHtml(normalizedMessage);
-        } catch (e) {
-          debug("could not normalize message", e);
-          normalizedMessage = rawMessage;
-        }
-
-        const payload = {
-          roomId: channel,
-          senderName: this.client.getUserById(user).name,
-          senderId: isMe ? undefined : user,
-          text: normalizedMessage,
-          html: html
-        };
-        return this.handleThirdPartyRoomMessage(payload).catch(err=>{
-          console.error(err);
-        });
-      });
-      debug('registered message listener');
-    }, 5000);
-    debug('waiting a little bit for initial self-messages to fire before listening for messages');
-    return this.client.connect();
-  }
-  getThirdPartyRoomDataById(id) {
-    const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
-    const room = this.client.getRoomById(id);
-    return {
-      name: room.name,
-      topic: room.isDirect ? directTopic() : room.purpose.value
-    }
-  }
-  sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
-    debug('sending message as puppet to third party room with id', id);
-    return this.client.sendMessage(text, id);
-  }
-}
+const App = require('./app');
 
 new Cli({
   port: config.port,
@@ -118,11 +48,12 @@ new Cli({
             let slackRoomId = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
             let slackRoom = app.client.getRoomById(slackRoomId);
             if (slackRoom) {
+              debug('getting app from slack room', slackRoom);
               matrixRoomAppMap[room_id] = app;
               return app;
             }
           }, null);
-          return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', matrixRoomId));
+          return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', room_id));
         }
       });
     }
@@ -164,16 +95,26 @@ new Cli({
       }
     }));
 
-    return puppet.startClient().then(()=>{
-      return Promise.map(config.slack, (team) => {
+    return bridge.run(port, config).then(()=>{
+      return puppet.startClient();
+    }).then(()=>{
+      return Promise.mapSeries(config.slack, (team) => {
         const app = new App(config, puppet, bridge);
         app.setSlackTeam(team.team_name, team.user_access_token);
-        app.initThirdPartyClient().then(() => app);
-        return app;
+        debug('initing teams');
+        return app.initThirdPartyClient().then(() => {
+          debug('team success');
+          return app
+        }).catch(err=> {
+          debug('team failure', err.message);
+          return app;
+        });
       })
     }).then((apps)=> {
+      apps.map(a=>{
+        debug('!!!! apps....', a.teamName);
+      });
       teamAppList = apps;
-      return bridge.run(port, config);
     }).then(()=>{
       console.log('Matrix-side listening on port %s', port);
     }).catch(err=>{
