@@ -9,7 +9,12 @@ class Client extends EventEmitter {
     super();
     this.token = token;
     this.rtm = null;
-    this.data = null;
+    this.data = {
+      self: {},
+      channels: [],
+      users: [],
+      ims: []
+    }
   }
   connect() {
     return new Promise((resolve, reject) => {
