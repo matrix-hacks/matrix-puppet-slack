@@ -38,7 +38,7 @@ class Client extends EventEmitter {
 
       this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
         debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
-        //require('fs').writeFileSync(`data-${rtmStartData.team.name}.json`, JSON.stringify(rtmStartData, null, 2));
+        require('fs').writeFileSync(`data-${rtmStartData.team.name}.json`, JSON.stringify(rtmStartData, null, 2));
         this.data = rtmStartData;
       });
 
@@ -69,6 +69,25 @@ class Client extends EventEmitter {
   }
   getSelfUserId() {
     return this.data.self.id;
+  }
+  /**
+   * Finds a bot by ID
+   *
+   * @returns {object} a bot:
+   * {
+   *   "id": "B03RKF7LP",
+   *   "deleted": false,
+   *   "name": "gdrive",
+   *   "app_id": "A0F7YS32P",
+   *   "icons": {
+   *     "image_36": "https://a.slack-edge.com/12b5a/plugins/gdrive/assets/service_36.png",
+   *     "image_48": "https://a.slack-edge.com/12b5a/plugins/gdrive/assets/service_48.png",
+   *     "image_72": "https://a.slack-edge.com/12b5a/plugins/gdrive/assets/service_72.png"
+   *   }
+   * }
+   **/
+  getBotById(id) {
+    return this.data.bots.find(u => u.id === id) || { name: "unknown" };
   }
   getUserById(id) {
     return this.data.users.find(u => u.id === id) || { name: "unknown" };

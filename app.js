@@ -1,7 +1,9 @@
 const debug = require('debug')('matrix-puppet:slack:app');
 const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
 const SlackClient = require('./client');
-
+const slackdown = require('./slackdown');
+const showdown  = require('showdown');
+const converter = new showdown.Converter();
 
 class App extends MatrixPuppetBridgeBase {
   setSlackTeam(teamName, userAccessToken) {
@@ -49,7 +51,9 @@ class App extends MatrixPuppetBridgeBase {
   }
   registerMessageListener() {
     this.client.on('message', (data)=>{
-      const { channel, user, text, attachments } = data;
+      const { channel, user, text, attachments, subtype, bot_id } = data;
+
+      const isBotMessage = subtype === 'bot_message';
 
       // any direct text
       let messages = [text];
@@ -62,26 +66,28 @@ class App extends MatrixPuppetBridgeBase {
         });
       }
 
-      const isMe = user === this.client.getSelfUserId();
-
       const rawMessage = messages.join('\n').trim();
-      let normalizedMessage = "";
-      let html = null;
+
+      let payload = { roomId: channel };
+
       try {
-        normalizedMessage = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
-        html = converter.makeHtml(normalizedMessage);
+        payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
+        payload.html = converter.makeHtml(payload.text);
       } catch (e) {
         debug("could not normalize message", e);
-        normalizedMessage = rawMessage;
+        payload.text = rawMessage;
       }
 
-      const payload = {
-        roomId: channel,
-        senderName: this.client.getUserById(user).name,
-        senderId: isMe ? undefined : user,
-        text: normalizedMessage,
-        html: html
-      };
+      // lastly, determine the sender
+      if (isBotMessage) {
+        payload.senderName = this.client.getBotById(bot_id).name;
+        payload.senderId = bot_id;
+      } else {
+        const isMe = user === this.client.getSelfUserId();
+        payload.senderName = this.client.getUserById(user).name;
+        payload.senderId = isMe ? undefined : user;
+      }
+
       return this.handleThirdPartyRoomMessage(payload).catch(err=>{
         console.error(err);
       });
