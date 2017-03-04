@@ -2,3 +2,4 @@ config.json
 node_modules
 *.yaml
 *.db
+data-*.json

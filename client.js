@@ -38,7 +38,11 @@ class Client extends EventEmitter {
 
       this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
         debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
-        require('fs').writeFileSync(`data-${rtmStartData.team.name}.json`, JSON.stringify(rtmStartData, null, 2));
+        if (process.env.DEBUG) {
+          const f = `data-${rtmStartData.team.name}.json`;
+          debug(`DEBUG environment variable is on. writing data dump file for your perusal: ${f}`);
+          require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
+        }
         this.data = rtmStartData;
       });
 
