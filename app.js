@@ -80,8 +80,10 @@ class App extends MatrixPuppetBridgeBase {
 
       // lastly, determine the sender
       if (isBotMessage) {
-        payload.senderName = this.client.getBotById(bot_id).name;
+        const bot = this.client.getBotById(bot_id);
+        payload.senderName = bot.name;
         payload.senderId = bot_id;
+        payload.avatarUrl = bot.icons.image_72
       } else {
         const isMe = user === this.client.getSelfUserId();
         payload.senderName = this.client.getUserById(user).name;
