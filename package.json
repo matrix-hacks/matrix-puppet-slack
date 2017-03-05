@@ -13,7 +13,7 @@
   "dependencies": {
     "@slack/client": "^3.8.1",
     "bluebird": "^3.4.7",
-    "matrix-puppet-bridge": "^1.9.0",
+    "matrix-puppet-bridge": "^1.9.1",
     "showdown": "^1.6.4"
   }
 }
