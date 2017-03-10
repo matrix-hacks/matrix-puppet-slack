@@ -100,7 +100,7 @@ class App extends MatrixPuppetBridgeBase {
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
     const room = this.client.getRoomById(id);
     return {
-      name: room.name,
+      name: room.name ? room.name : "Room name unavailable",
       topic: room.isDirect ? directTopic() : room.purpose.value
     }
   }
