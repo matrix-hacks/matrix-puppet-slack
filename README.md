@@ -37,3 +37,29 @@ Edit your homeserver.yaml file and update the `app_service_config_files` with th
 Launch the bridge with ```node index.js```.
 
 Restart your HS.
+
+## Features and Roadmap
+
+ - [x] Multi-team
+ - [x] Channel messages
+ - [x] Direct messages
+  - [x] Recieving
+  - [ ] Initiating
+ - Matrix -> Slack
+   - [x] Text content
+   - [x] Image content
+   - [ ] Audio/Video content
+   - [ ] Typing notifs
+   - [ ] User Profiles
+ - Slack -> Matrix
+   - [x] Text content
+   - [x] Image/Audio/Video content as protected link to slack
+   - [ ] Image/Audio/Video content as upload & embed to matrix
+   - [ ] Typing notifs
+   - [ ] User Profiles
+   - [ ] Presence
+ - [x] Third Party Lookup
+  - [x] Rooms
+  - [x] Users
+ - [x] Puppet a user's real Slack account.
+ - [ ] Rooms react to Slack updates
