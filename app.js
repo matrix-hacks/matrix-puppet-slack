@@ -79,11 +79,15 @@ class App extends MatrixPuppetBridgeBase {
       }
 
       // lastly, determine the sender
-      if (isBotMessage) {
+      if (bot_id) {
         const bot = this.client.getBotById(bot_id);
         payload.senderName = bot.name;
         payload.senderId = bot_id;
         payload.avatarUrl = bot.icons.image_72
+      } else if (user === "USLACKBOT") {
+        payload.senderName = data.user_profile.name;
+        payload.senderId = data.user;
+        payload.avatarUrl = data.user_profile.image_72;
       } else {
         const isMe = user === this.client.getSelfUserId();
         payload.senderName = this.client.getUserById(user).name;
@@ -97,10 +101,11 @@ class App extends MatrixPuppetBridgeBase {
     debug('registered message listener');
   }
   getThirdPartyRoomDataById(id) {
+    const directName = (user) => this.client.getUserById(user).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
     const room = this.client.getRoomById(id);
     return {
-      name: room.name,
+      name: room.isDirect ? directName(room.user) : room.name,
       topic: room.isDirect ? directTopic() : room.purpose.value
     }
   }
