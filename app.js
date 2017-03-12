@@ -53,11 +53,13 @@ class App extends MatrixPuppetBridgeBase {
     this.client.on('message', (data)=>{
       const { channel, user, text, attachments, subtype, bot_id } = data;
 
-      const isBotMessage = subtype === 'bot_message';
+      if (subtype === "message_changed") {
+        debug('ignoring an edit');
+        return;
+      }
 
       // any direct text
       let messages = [text];
-
       // any attachments, stuff it into the text as new lines
       if (attachments) {
         attachments.forEach(att=>{
@@ -65,9 +67,7 @@ class App extends MatrixPuppetBridgeBase {
           messages.push(att.text);
         });
       }
-
       const rawMessage = messages.join('\n').trim();
-
       let payload = { roomId: channel };
 
       try {
