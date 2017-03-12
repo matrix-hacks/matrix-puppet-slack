@@ -3,7 +3,9 @@ const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
 const SlackClient = require('./client');
 const slackdown = require('./slackdown');
 const showdown  = require('showdown');
-const converter = new showdown.Converter();
+const converter = new showdown.Converter({
+  literalMidWordUnderscores : true
+});
 
 class App extends MatrixPuppetBridgeBase {
   setSlackTeam(teamName, userAccessToken) {
