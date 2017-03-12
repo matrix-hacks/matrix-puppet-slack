@@ -1,14 +1,14 @@
 const debug = require('debug')('matrix-puppet:slack:client');
-const RtmClient = require('@slack/client').RtmClient;
-const CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
-const EventEmitter = require('events').EventEmitter;
 const Promise = require('bluebird');
+const EventEmitter = require('events').EventEmitter;
+const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
 
 class Client extends EventEmitter {
   constructor(token) {
     super();
     this.token = token;
     this.rtm = null;
+    this.web = null;
     this.data = {
       self: {},
       channels: [],
@@ -37,6 +37,7 @@ class Client extends EventEmitter {
       });
 
       this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+        this.web = new WebClient(this.token);
         debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
         if (process.env.DEBUG) {
           const f = `data-${rtmStartData.team.name}.json`;
@@ -125,6 +126,29 @@ class Client extends EventEmitter {
   }
   getChannels() {
     return this.data.channels;
+  }
+  /**
+   * Posts an image to the slack channel.
+   * You cannot do this with the RTM api, so we
+   * use the slack web api for this.
+   *
+   * Attachments are pretty cool, check it here:
+   * https://api.slack.com/docs/messages/builder
+   */
+  sendPictureMessage(imageUrl, channel) {
+    return new Promise((resolve, reject) => {
+      this.web.chat.postMessage(channel, null, {
+        as_user: true,
+        attachments:[
+          {
+            fallback: imageUrl,
+            image_url: imageUrl
+          }
+        ]
+      }, (err, res) => {
+        err ? reject(err) : resolve(res);
+      });
+    });
   }
 }
 
