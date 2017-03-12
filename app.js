@@ -98,19 +98,21 @@ class App extends MatrixPuppetBridgeBase {
     }
 
     // lastly, determine the sender
-    if (bot_id) {
+    if (user) {
+      if ( user === "USLACKBOT" ) {
+        payload.senderName = user_profile.name;
+        payload.senderId = user;
+        payload.avatarUrl = user_profile.image_72;
+      } else {
+        const isMe = user === this.client.getSelfUserId();
+        payload.senderName = this.client.getUserById(user).name;
+        payload.senderId = isMe ? undefined : user;
+      }
+    } else if (bot_id) {
       const bot = this.client.getBotById(bot_id);
       payload.senderName = bot.name;
       payload.senderId = bot_id;
       payload.avatarUrl = bot.icons.image_72
-    } else if (user === "USLACKBOT") {
-      payload.senderName = user_profile.name;
-      payload.senderId = user;
-      payload.avatarUrl = user_profile.image_72;
-    } else {
-      const isMe = user === this.client.getSelfUserId();
-      payload.senderName = this.client.getUserById(user).name;
-      payload.senderId = isMe ? undefined : user;
     }
 
     return this.handleThirdPartyRoomMessage(payload).catch(err=>{
