@@ -13,6 +13,7 @@ class App extends MatrixPuppetBridgeBase {
     this.userAccessToken = userAccessToken;
     this.slackPrefix = 'slack';
     this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
+    this.statusRoomAliasLocalPart = `${this.slackPrefix}_${this.getStatusRoomPostfix()}`;
   }
   getServiceName() {
     return "Slack";
@@ -21,10 +22,9 @@ class App extends MatrixPuppetBridgeBase {
     return this.servicePrefix;
   }
   sendStatus(_msg) {
-    let msg = `${this.teamName}: ${_msg}`
+    let msg = `${this.teamName}: ${_msg}`;
     this.sendStatusMsg({
-      fixedWidthOutput: false,
-      roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      fixedWidthOutput: false
     }, msg).catch((err)=>{
       console.log(err);
     });
@@ -45,6 +45,8 @@ class App extends MatrixPuppetBridgeBase {
     });
     this.client.on('connected', (err)=>{
       this.sendStatus(`connected`);
+      // on restart, update all "unknown" display names #19
+      // this.puppet.getMatrixRoomMembers
     });
     return this.client.connect().then(()=>{
       debug('waiting a little bit for initial self-messages to fire before listening for messages');

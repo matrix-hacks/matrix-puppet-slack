@@ -26,7 +26,7 @@ class Client extends EventEmitter {
         reject(err);
       });
 
-      // disconnect is called only when there is on chance of reconnection,
+      // disconnect is called only when there is no chance of reconnection,
       // either due to unrecoverable errors or the disabling of reconnect
       // so it's the best way to know to act towards reconnecting
       // the issue here is that at this point we dont know if

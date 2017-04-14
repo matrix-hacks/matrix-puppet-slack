@@ -13,7 +13,38 @@
   "dependencies": {
     "@slack/client": "^3.8.1",
     "bluebird": "^3.4.7",
-    "matrix-puppet-bridge": "^1.10.0",
+    "matrix-puppet-bridge": "^1.13.0",
     "showdown": "^1.6.4"
+  },
+  "eslintConfig": {
+    "env": {
+      "es6": true,
+      "node": true
+    },
+    "extends": "eslint:recommended",
+    "rules": {
+      "no-console": 0,
+      "indent": [
+        "error",
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "linebreak-style": [
+        "error",
+        "unix"
+      ],
+      "semi": [
+        "error",
+        "always"
+      ],
+      "no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    }
   }
 }

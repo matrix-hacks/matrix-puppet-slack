@@ -1,4 +1,3 @@
-const path = require('path');
 const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
@@ -9,9 +8,6 @@ const {
 const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
 const Promise = require('bluebird');
-const slackdown = require('./slackdown');
-const showdown  = require('showdown');
-const converter = new showdown.Converter();
 const App = require('./app');
 
 new Cli({
@@ -39,24 +35,34 @@ new Cli({
     // although that would be silly, right?
     const getAndCacheAppFromMatrixRoomId = (room_id) => {
       return new Promise((resolve, reject) => {
-        let app = matrixRoomAppMap[room_id];
-        if (app) {
-          return resolve(app);
-        } else {
-          let ret = teamAppList.reduce((acc, app)=>{
-            if ( acc ) return acc;
-            let slackRoomId = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
-            let slackRoom = app.client.getRoomById(slackRoomId);
-            if (slackRoom) {
-              debug('getting app from slack room', slackRoom);
-              matrixRoomAppMap[room_id] = app;
-              return app;
+        teamAppList[0].getStatusRoomId().then(id=>{
+          if ( id === room_id ) {
+            resolve(teamAppList[0]);
+          } else {
+            let app = matrixRoomAppMap[room_id];
+            if (app) {
+              return resolve(app);
+            } else {
+              let ret = teamAppList.reduce((acc, app)=>{
+                if ( acc ) return acc;
+                let slackRoomId = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+                let slackRoom = app.client.getRoomById(slackRoomId);
+                if (slackRoom) {
+                  debug('getting app from slack room', slackRoom);
+                  matrixRoomAppMap[room_id] = app;
+                  return app;
+                }
+              }, null);
+              if (ret) {
+                resolve(ret);
+              } else {
+                reject(new Error('could not find slack team app for matrix room id', room_id));
+              }
             }
-          }, null);
-          return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', room_id));
-        }
+          }
+        });
       });
-    }
+    };
 
     const bridge = new Bridge(Object.assign({}, config.bridge, {
       controller: {
