@@ -194,6 +194,7 @@ class App extends MatrixPuppetBridgeBase {
     return this.client.sendMessage(text, id);
   }
   sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+    console.log(data);
     return this.client.sendImageMessage(data.url, data.text, id);
   }
 }

@@ -155,12 +155,13 @@ class Client extends EventEmitter {
    * https://api.slack.com/docs/messages/builder
    */
   sendImageMessage(imageUrl, title, channel) {
+    console.log(imageUrl);
     return new Promise((resolve, reject) => {
       this.web.chat.postMessage(channel, null, {
         as_user: true,
         attachments:[
           {
-            fallback: imageUrl,
+            fallback: title,
             image_url: imageUrl,
             title: title
           }

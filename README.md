@@ -54,7 +54,7 @@ Restart your HS.
  - Slack -> Matrix
    - [x] Text content
    - [x] Image/Audio/Video content as protected link to slack
-   - [ ] Image/Audio/Video content as upload & embed to matrix
+   - [x] Image/Audio/Video content as upload & embed to matrix
    - [ ] Typing notifs
    - [ ] User Profiles
    - [ ] Presence
