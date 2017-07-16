@@ -58,19 +58,86 @@ class App extends MatrixPuppetBridgeBase {
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
           user: data.message.user
-        })
+        });
       } else {
-        this.createAndSendPayload({
-          channel: data.channel,
-          text: data.text,
-          attachments: data.attachments,
-          bot_id: data.bot_id,
-          user: data.user,
-          user_profile: data.user_profile,
-        })
+        if (data.file) {
+          this.sendFile(data).then(() => {
+            if (data.file.initial_comment) {
+              this.createAndSendPayload({
+                channel: data.channel,
+                text: data.file.initial_comment.comment,
+                attachments: data.attachments,
+                bot_id: data.bot_id,
+                user: data.user,
+                user_profile: data.user_profile,
+              });
+            }
+          });
+        } else {
+          this.createAndSendPayload({
+            channel: data.channel,
+            text: data.text,
+            attachments: data.attachments,
+            bot_id: data.bot_id,
+            user: data.user,
+            user_profile: data.user_profile,
+          });
+        }
       }
     });
     debug('registered message listener');
+  }
+  getPayload(data) {
+    const {
+      channel,
+      text,
+      attachments,
+      bot_id,
+      user,
+      user_profile,
+      file,
+    } = data;
+    let payload = { roomId: channel };
+    
+    if (user) {
+      if ( user === "USLACKBOT" ) {
+        payload.senderName = user_profile.name;
+        payload.senderId = user;
+        payload.avatarUrl = user_profile.image_72;
+      } else {
+        const isMe = user === this.client.getSelfUserId();
+        let uu = this.client.getUserById(user);
+        payload.senderId = isMe ? undefined : user;
+        if (uu) {
+          payload.senderName = uu.name;
+          payload.avatarUrl = uu.profile.image_512;
+        } else {
+          payload.senderName = "unknown";
+        }
+      }
+    } else if (bot_id) {
+      const bot = this.client.getBotById(bot_id);
+      payload.senderName = bot.name;
+      payload.senderId = bot_id;
+      payload.avatarUrl = bot.icons.image_72
+    }
+    return payload;
+  }
+  sendFile(data) {
+    let payload = this.getPayload(data);
+    payload.text = data.file.name;
+    payload.url = ''; // to prevent errors
+    return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
+      console.log(buffer);
+      console.log(buffer.toString('utf-8'));
+      payload.buffer = buffer;
+      payload.mimetype = type;
+      return this.handleThirdPartyRoomImageMessage(payload);
+    }).catch((err) => {
+      console.log(err);
+      payload.text = '[Image] ('+data.name+') '+data.url;
+      return this.handleThirdPartyRoomMessage(payload);
+    });
   }
   createAndSendPayload(data) {
     const {
@@ -80,6 +147,7 @@ class App extends MatrixPuppetBridgeBase {
       bot_id,
       user,
       user_profile,
+      file,
     } = data;
     // any direct text
     let messages = [text];
@@ -87,7 +155,7 @@ class App extends MatrixPuppetBridgeBase {
     if (attachments) attachments.forEach(att=> messages.push(att.text))
 
     const rawMessage = messages.join('\n').trim();
-    let payload = { roomId: channel };
+    let payload = this.getPayload(data);
 
     try {
       payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
@@ -97,23 +165,7 @@ class App extends MatrixPuppetBridgeBase {
       payload.text = rawMessage;
     }
 
-    // lastly, determine the sender
-    if (user) {
-      if ( user === "USLACKBOT" ) {
-        payload.senderName = user_profile.name;
-        payload.senderId = user;
-        payload.avatarUrl = user_profile.image_72;
-      } else {
-        const isMe = user === this.client.getSelfUserId();
-        payload.senderName = this.client.getUserById(user).name;
-        payload.senderId = isMe ? undefined : user;
-      }
-    } else if (bot_id) {
-      const bot = this.client.getBotById(bot_id);
-      payload.senderName = bot.name;
-      payload.senderId = bot_id;
-      payload.avatarUrl = bot.icons.image_72
-    }
+    
 
     return this.handleThirdPartyRoomMessage(payload).catch(err=>{
       console.error(err);
@@ -134,12 +186,15 @@ class App extends MatrixPuppetBridgeBase {
       topic: room.isDirect ? directTopic() : room.purpose.value
     }
   }
+  sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
+    // not available for now
+  }
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
     debug('sending message as puppet to third party room with id', id);
     return this.client.sendMessage(text, id);
   }
-  sendPictureMessageAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, messageText, imageFile, matrixEvent, publicImageUrl) {
-    return this.client.sendPictureMessage(publicImageUrl, thirdPartyRoomId);
+  sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+    return this.client.sendImageMessage(data.url, data.text, id);
   }
 }
 
