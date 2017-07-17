@@ -3,6 +3,7 @@ const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
 const SlackClient = require('./client');
 const slackdown = require('./slackdown');
 const showdown  = require('showdown');
+const emojione = require('emojione')
 const converter = new showdown.Converter({
   literalMidWordUnderscores : true
 });
@@ -53,6 +54,7 @@ class App extends MatrixPuppetBridgeBase {
   }
   registerMessageListener() {
     this.client.on('message', (data)=>{
+      console.log(data);
       if (data.subtype === "message_changed") {
         this.createAndSendPayload({
           channel: data.channel,
@@ -128,8 +130,6 @@ class App extends MatrixPuppetBridgeBase {
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
     return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
-      console.log(buffer);
-      console.log(buffer.toString('utf-8'));
       payload.buffer = buffer;
       payload.mimetype = type;
       return this.handleThirdPartyRoomImageMessage(payload);
@@ -154,13 +154,26 @@ class App extends MatrixPuppetBridgeBase {
     // any attachments, stuff it into the text as new lines
     if (attachments) attachments.forEach(att=> messages.push(att.text))
 
-    const rawMessage = messages.join('\n').trim();
+    let rawMessage = messages.join('\n').trim();
     let payload = this.getPayload(data);
 
     try {
+      const replacements = [
+        [':+1:', ':thumbsup:'],
+        [':-1:', ':thumbsdown:'],
+        [':facepunch:', ':punch:'],
+        [':hankey:', ':poop:'],
+        [':slightly_smiling_face:', ':slight_smile:'],
+        [':upside_down_face:', ':upside_down:'],
+      ];
+      for (let i = 0; i < replacements.length; i++) {
+        rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
+      }
+      rawMessage = emojione.shortnameToUnicode(rawMessage);
       payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
       payload.html = converter.makeHtml(payload.text);
     } catch (e) {
+      console.log(e);
       debug("could not normalize message", e);
       payload.text = rawMessage;
     }
@@ -194,7 +207,6 @@ class App extends MatrixPuppetBridgeBase {
     return this.client.sendMessage(text, id);
   }
   sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
-    console.log(data);
     return this.client.sendImageMessage(data.url, data.text, id);
   }
 }
