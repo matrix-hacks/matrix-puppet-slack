@@ -2,6 +2,7 @@ const debug = require('debug')('matrix-puppet:slack:client');
 const Promise = require('bluebird');
 const EventEmitter = require('events').EventEmitter;
 const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
+const { download } = require('./utils');
 
 class Client extends EventEmitter {
   constructor(token) {
@@ -45,6 +46,7 @@ class Client extends EventEmitter {
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
         this.data = rtmStartData;
+        this.data.channels = this.data.channels.concat(this.data.groups); // we want the hidden channels, "groups", too!
       });
 
       // you need to wait for the client to fully connect before you can send messages
@@ -55,15 +57,32 @@ class Client extends EventEmitter {
 
       this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
         let data = JSON.parse(payload);
+        //console.log(data);
         if ( data.type === "message" ) {
           debug('emitting message:', data);
           this.emit('message', data);
         } else if (data.type === 'channel_joined') {
           this.data.channels.push(data.channel);
+        } else if (data.type === 'group_joined') {
+          this.data.channels.push(data.channel);
         } else if (data.type === 'reconnect_url') {
           // ignore
         } else if (data.type === 'pong') {
           // ignore
+        } else if (data.type === 'team_join') {
+          this.data.users.push(data.user);
+        } else if (data.type === 'user_change') {
+          let found = false;
+          for (let i = 0; i < this.data.users.length; i++) {
+            if (this.data.users[i].id == data.user.id) {
+              this.data.users[i] = data.user;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            this.data.users.push(data.user);
+          }
         } else {
           debug('raw message, type:', data.type);
         }
@@ -95,7 +114,7 @@ class Client extends EventEmitter {
     return this.data.bots.find(u => u.id === id) || { name: "unknown" };
   }
   getUserById(id) {
-    return this.data.users.find(u => u.id === id) || { name: "unknown" };
+    return this.data.users.find(u => u.id === id);
   }
   getChannelById(id) {
     return this.data.channels.find(c => c.id === id);
@@ -135,19 +154,25 @@ class Client extends EventEmitter {
    * Attachments are pretty cool, check it here:
    * https://api.slack.com/docs/messages/builder
    */
-  sendPictureMessage(imageUrl, channel) {
+  sendImageMessage(imageUrl, title, channel) {
     return new Promise((resolve, reject) => {
       this.web.chat.postMessage(channel, null, {
         as_user: true,
         attachments:[
           {
-            fallback: imageUrl,
-            image_url: imageUrl
+            fallback: title,
+            image_url: imageUrl,
+            title: title
           }
         ]
       }, (err, res) => {
         err ? reject(err) : resolve(res);
       });
+    });
+  }
+  downloadImage(url) {
+    return download.getBufferAndType(url, {
+      headers: { Authorization: 'Bearer ' +  this.token}
     });
   }
 }
