@@ -165,6 +165,11 @@ class App extends MatrixPuppetBridgeBase {
         [':hankey:', ':poop:'],
         [':slightly_smiling_face:', ':slight_smile:'],
         [':upside_down_face:', ':upside_down:'],
+        [':skin-tone-2:', '🏻'],
+        [':skin-tone-3:', '🏼'],
+        [':skin-tone-4:', '🏽'],
+        [':skin-tone-5:', '🏾'],
+        [':skin-tone-6:', '🏿'],
       ];
       for (let i = 0; i < replacements.length; i++) {
         rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
