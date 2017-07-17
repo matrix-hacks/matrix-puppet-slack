@@ -75,7 +75,7 @@ class Client extends EventEmitter {
           let found = false;
           for (let i = 0; i < this.data.users.length; i++) {
             if (this.data.users[i].id == data.user.id) {
-              this.data.users[i] = data.user.id;
+              this.data.users[i] = data.user;
               found = true;
               break;
             }
