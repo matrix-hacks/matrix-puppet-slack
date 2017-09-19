@@ -1,13 +1,10 @@
-"use strict";
-
-class slacktomd {
+export class slacktomd {
+  private users: any;
+  private channels: any;
   constructor() {
   }
 
-  _payloads(tag, start) {
-    if(!start) {
-      start = 0;
-    }
+  _payloads(tag, start = 0) {
     let length = tag.length;
     return this._pipeSplit(tag.substr(start, length - start));
   }
@@ -16,10 +13,13 @@ class slacktomd {
     return payload.split('|');
   }
 
-  _tag(tag, attributes, payload) {
+  _tag(tag, attributes, payload = {}) {
+    let _html = '';
     if(!payload) {
-      payload = attributes;
+      _html = attributes;
       attributes = {};
+    } else {
+      _html = attributes;
     }
 
     let html = "<".concat(tag);
@@ -28,7 +28,7 @@ class slacktomd {
           html = html.concat(' ', attribute, '="', attributes[attribute], '"');
       }
     }
-    return html.concat('>', payload, '</', tag, '>');
+    return html.concat('>', _html, '</', tag, '>');
   }
 
   _getUser(u) {
@@ -77,7 +77,7 @@ class slacktomd {
     }
   }
 
-  _markdownTag(tag, payload, linkText) {
+  _markdownTag(tag, payload, linkText = '') {
     if(!linkText) {
       linkText = payload;
     }
@@ -85,25 +85,18 @@ class slacktomd {
     switch(tag) {
       case "italic":
         return "_" + payload + "_";
-        break;
       case "bold":
         return "**" + payload + "**";
-        break;
       case "fixed":
         return "`" + payload + "`";
-        break;
       case "blockFixed":
         return "```" + payload + "```";
-        break;
       case "strike":
         return "~~" + payload + "~~";
-        break;
       case "href":
         return "[" + linkText + "](" + payload + ")";
-        break;
       default:
         return payload;
-        break;
     }
   }
 
@@ -191,7 +184,6 @@ class slacktomd {
             break;
           default:
             return text;
-            break;
         }
 
         if (replace) {
@@ -208,5 +200,3 @@ class slacktomd {
     return this._publicParse(text);
   }
 }
-
-module.exports = slacktomd;

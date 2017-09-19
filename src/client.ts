@@ -1,10 +1,11 @@
 const debug = require('debug')('matrix-puppet:slack:client');
 const Promise = require('bluebird');
-const EventEmitter = require('events').EventEmitter;
-const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
-const { download } = require('./utils');
+export const EventEmitter = require('events').EventEmitter;
+import { WebClient, RtmClient, CLIENT_EVENTS } from '@slack/client';
+import { download } from 'matrix-puppet-bridge';
 
-class Client extends EventEmitter {
+
+export class SlackClient extends (EventEmitter as { new(): any; }) {
   constructor(token) {
     super();
     this.token = token;
@@ -176,5 +177,3 @@ class Client extends EventEmitter {
     });
   }
 }
-
-module.exports = Client;

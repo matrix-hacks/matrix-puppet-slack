@@ -1,56 +1,47 @@
-const debug = require('debug')('matrix-puppet:slack:app');
-const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
-const SlackClient = require('./client');
-const slackdown = require('./slackdown');
-const showdown  = require('showdown');
-const emojione = require('emojione')
-const converter = new showdown.Converter({
-  literalMidWordUnderscores : true
-});
+import {
+  ThirdPartyAdapter,
+  
+  download, entities,
+  
+  ThirdPartyPayload, ThirdPartyMessagePayload, ThirdPartyImageMessagePayload,
+  UserData, RoomData
+} from 'matrix-puppet-bridge';
 
-class App extends MatrixPuppetBridgeBase {
-  setSlackTeam(teamName, userAccessToken) {
-    this.teamName = teamName;
-    this.userAccessToken = userAccessToken;
-    this.slackPrefix = 'slack';
-    this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
-  }
-  getServiceName() {
-    return "Slack";
-  }
-  getServicePrefix() {
-    return this.servicePrefix;
-  }
-  sendStatus(_msg) {
-    let msg = `${this.teamName}: ${_msg}`
-    this.sendStatusMsg({
-      fixedWidthOutput: false,
-      roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-    }, msg).catch((err)=>{
-      console.log(err);
-    });
-  }
-  initThirdPartyClient() {
-    this.client = new SlackClient(this.userAccessToken);
+import * as path from 'path';
+import * as emojione from 'emojione';
+
+const debug = require('debug')('matrix-puppet:slack');
+import { slackdown } from './slackdown';
+import * as showdown from 'showdown';
+const converter = new showdown.Converter();
+import { SlackClient } from './client'
+
+export class Adapter extends ThirdPartyAdapter {
+  public serviceName = 'Slack';
+  private client: SlackClient;
+  private teamName: string;
+  startClient(): Promise<void> {
+    this.teamName = this.config.team_name;
+    this.client = new SlackClient(this.config.user_access_token);
     this.client.on('unable-to-start', (err)=>{
-      this.sendStatus(`unable to start: ${err.message}`);
+      this.puppetBridge.sendStatusMsg({},`unable to start: ${err.message}`);
     });
     this.client.on('disconnected', ()=>{
-      this.sendStatus('disconnected. will try to reconnect in a minute...');
+      this.puppetBridge.sendStatusMsg({},'disconnected. will try to reconnect in a minute...');
       setTimeout(()=> {
-        this.initThirdPartyClient().catch((err)=>{
+        this.startClient().catch((err)=>{
           debug('reconnect failed with error', err.message);
-          this.sendStatus('reconnnect failed with error', err.message);
+          this.puppetBridge.sendStatusMsg({},'reconnnect failed with error', err.message);
         })
       }, 60 * 1000);
     });
     this.client.on('connected', (err)=>{
-      this.sendStatus(`connected`);
+      this.puppetBridge.sendStatusMsg({},`connected`);
     });
     return this.client.connect().then(()=>{
       debug('waiting a little bit for initial self-messages to fire before listening for messages');
       setTimeout(()=>this.registerMessageListener(), 5000);
-    })
+    });
   }
   registerMessageListener() {
     this.client.on('message', (data)=>{
@@ -89,56 +80,51 @@ class App extends MatrixPuppetBridgeBase {
     });
     debug('registered message listener');
   }
-  getPayload(data) {
-    const {
-      channel,
-      text,
-      attachments,
-      bot_id,
-      user,
-      user_profile,
-      file,
-    } = data;
-    let payload = { roomId: channel };
-    
-    if (user) {
-      if ( user === "USLACKBOT" ) {
-        payload.senderName = user_profile.name;
-        payload.senderId = user;
-        payload.avatarUrl = user_profile.image_72;
+  getPayload(data): ThirdPartyPayload {
+    let payload = <ThirdPartyPayload>{
+      roomId: data.channel,
+      senderId: undefined,
+    };
+    if (data.user) {
+      if (data.user === 'USLACKBOT') {
+        payload.senderName = data.user_profile ? data.user_profile.name : 'unknown';
+        payload.senderId = data.user;
+        payload.avatarUrl = data.user_profile ? data.user_profile.image_72 : undefined;
       } else {
-        const isMe = user === this.client.getSelfUserId();
-        let uu = this.client.getUserById(user);
-        payload.senderId = isMe ? undefined : user;
+        const isMe = data.user === this.client.getSelfUserId();
+        let uu = this.client.getUserById(data.user);
+        payload.senderId = isMe ? undefined : data.user;
         if (uu) {
           payload.senderName = uu.name;
           payload.avatarUrl = uu.profile.image_512;
         } else {
-          payload.senderName = "unknown";
+          payload.senderName = 'unknown';
         }
       }
-    } else if (bot_id) {
-      const bot = this.client.getBotById(bot_id);
+    } else if (data.bot_id) {
+      const bot = this.client.getBotById(data.bot_id);
       payload.senderName = bot.name;
-      payload.senderId = bot_id;
-      payload.avatarUrl = bot.icons.image_72
+      payload.senderId = data.bot_id;
+      payload.avatarUrl = bot.icons.image_72;
     }
     return payload;
   }
+  
   sendFile(data) {
-    let payload = this.getPayload(data);
+    let payload = <ThirdPartyImageMessagePayload>this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
     return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
       payload.buffer = buffer;
       payload.mimetype = type;
-      return this.handleThirdPartyRoomImageMessage(payload);
-    }).catch((err) => {
+      return this.puppetBridge.sendImageMessage(payload);
+     }).catch((err) => {
       console.log(err);
       payload.text = '[Image] ('+data.name+') '+data.url;
-      return this.handleThirdPartyRoomMessage(payload);
+      return this.puppetBridge.sendImageMessage(payload);
     });
   }
+  
   createAndSendPayload(data) {
     const {
       channel,
@@ -149,14 +135,12 @@ class App extends MatrixPuppetBridgeBase {
       user_profile,
       file,
     } = data;
-    // any direct text
     let messages = [text];
-    // any attachments, stuff it into the text as new lines
-    if (attachments) attachments.forEach(att=> messages.push(att.text))
-
+    if (attachments) attachments.forEach(att=> messages.push(att.text));
+    
     let rawMessage = messages.join('\n').trim();
-    let payload = this.getPayload(data);
-
+    let payload = <ThirdPartyMessagePayload>this.getPayload(data);
+    
     try {
       const replacements = [
         [':+1:', ':thumbsup:'],
@@ -182,38 +166,52 @@ class App extends MatrixPuppetBridgeBase {
       debug("could not normalize message", e);
       payload.text = rawMessage;
     }
-
-    
-
-    return this.handleThirdPartyRoomMessage(payload).catch(err=>{
-      console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
-        console.error(err);
-      });
+    return this.puppetBridge.sendMessage(payload);
+  }
+  
+  getUserData(id): Promise<UserData>{
+    return Promise.resolve(() => {
+      let uu = this.client.getUserById(id);
+      let payload = <UserData>{
+        name: id,
+      };
+      if (uu) {
+        payload.name = uu.name;
+        payload.avatarUrl = uu.profile.image_512;
+      }
     });
   }
-  getThirdPartyRoomDataById(id) {
-    const directName = (user) => this.client.getUserById(user).name;
-    const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
-    const room = this.client.getRoomById(id);
-    return {
-      name: room.isDirect ? directName(room.user) : room.name,
-      topic: room.isDirect ? directTopic() : room.purpose.value
-    }
+  
+  getRoomData(id: string): Promise<RoomData> {
+    return new Promise<RoomData>((resolve, reject) => {
+      const room = this.client.getRoomById(id);
+      if (!room) {
+        return reject();
+      }
+      let payload = <RoomData>{
+        name: '',
+        topic: '',
+        isDirect: room.isDirect
+      };
+      if (room.isDirect) {
+        const uu = this.client.getUserById(room.user);
+        if (uu) {
+          payload.name = uu.name;
+          payload.topic = `Slack Direct Message (Team: ${this.teamName})`
+        }
+      }
+      if(!payload.name) {
+        payload.name = room.name;
+        payload.topic = room.purpose.value;
+      }
+      return resolve(payload);
+    });
   }
-  sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
-    // not available for now
-  }
-  sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
+  sendMessage(id, text) {
     debug('sending message as puppet to third party room with id', id);
     return this.client.sendMessage(text, id);
   }
-  sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+  sendImageMessage(id, data) {
     return this.client.sendImageMessage(data.url, data.text, id);
   }
-}
-
-module.exports = App;
+};
