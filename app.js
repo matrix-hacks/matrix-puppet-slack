@@ -242,10 +242,16 @@ class App extends MatrixPuppetBridgeBase {
         rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
       }
       rawMessage = emojione.shortnameToUnicode(rawMessage);
+      console.log("rawMessage");
+      console.log(rawMessage);
       payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
       payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
+      console.log("payload.text");
+      console.log(payload.text);
       payload.html = converter.makeHtml(payload.text);
+      console.log("payload.html");
+      console.log(payload.html);
     } catch (e) {
       console.log(e);
       debug("could not normalize message", e);
