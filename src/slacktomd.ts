@@ -78,6 +78,8 @@ export class slacktomd {
   }
 
   _markdownTag(tag, payload, linkText = '') {
+    payload = payload.toString();
+
     if(!linkText) {
       linkText = payload;
     }
@@ -90,7 +92,7 @@ export class slacktomd {
       case "fixed":
         return "`" + payload + "`";
       case "blockFixed":
-        return "```" + payload + "```";
+        return "```\n" + payload.trim() + "\n```";
       case "strike":
         return "~~" + payload + "~~";
       case "href":
