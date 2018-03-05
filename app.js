@@ -245,11 +245,14 @@ class App extends MatrixPuppetBridgeBase {
       console.log("rawMessage");
       console.log(rawMessage);
       payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
-      payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
-      payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
+      let markdown = payload.text
+      markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
+      markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
+      payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
+      payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '');
       console.log("payload.text");
       console.log(payload.text);
-      payload.html = converter.makeHtml(payload.text);
+      payload.html = converter.makeHtml(markdown);
       console.log("payload.html");
       console.log(payload.html);
     } catch (e) {
