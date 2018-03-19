@@ -237,6 +237,10 @@ class App extends MatrixPuppetBridgeBase {
         [':skin-tone-4:', '🏽'],
         [':skin-tone-5:', '🏾'],
         [':skin-tone-6:', '🏿'],
+        ['<!channel>', '@room'],
+          // NOTE: <!channel> is converted to @room here,
+          // and not in slacktomd, because we're translating Slack parlance
+          // to Matrix parlance, not parsing "Slackdown" to turn into Markdown.
       ];
       for (let i = 0; i < replacements.length; i++) {
         rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
