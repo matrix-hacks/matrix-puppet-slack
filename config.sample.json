@@ -4,11 +4,10 @@
     "user_access_token": "<slack 'test' token>"
   }],
   "registrationPath": "slack-registration.yaml",
-  "port": 8092,
+  "port": 8090,
   "bridge": {
     "homeserverUrl":"https://synapse.keyvan.pw",
     "domain": "synapse.keyvan.pw",
     "registration": "slack-registration.yaml"
   }
 }
-
