@@ -218,8 +218,8 @@ class App extends MatrixPuppetBridgeBase {
 
     let rawMessage =
       messages
-        .map(m => m.trim())
         .filter(m => m && (typeof m === "string"))
+        .map(m => m.trim())
         .join('\n')
         .trim();
     let payload = this.getPayload(data);
