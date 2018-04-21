@@ -5,7 +5,8 @@ const slackdown = require('./slackdown');
 const showdown  = require('showdown');
 const emojione = require('emojione')
 const converter = new showdown.Converter({
-  literalMidWordUnderscores : true
+  literalMidWordUnderscores : true,
+  simpleLineBreaks: true
 });
 
 class App extends MatrixPuppetBridgeBase {
@@ -152,9 +153,75 @@ class App extends MatrixPuppetBridgeBase {
     // any direct text
     let messages = [text];
     // any attachments, stuff it into the text as new lines
-    if (attachments) attachments.forEach(att=> messages.push(att.text))
+    if (attachments) {
+      /* FIXME: Right now, doing this properly would cause too much churn.
+       * The attachments are also in Slack's markdown-like
+       * formatting, not real markdown, but they require features
+       * (e.g. links with custom text) that Slack formatting doesn't support.
+       * Because we need to process the "slackdown", but also implement those
+       * features, we mix in some real markdown that makes it past our
+       * slackdown-to-markdown converter. We also need <font> tags for our
+       * colorization, but the converter can't handle the raw HTML (which
+       * slackdown doesn't allow), and we don't want to turn HTML in Slack
+       * messages into real HTML (it should show as plaintext just like it
+       * does in Slack, lest we try to turn "</sarcasm>" into real end tags),
+       * so we hack around it by implementing our own silly font color hack.
+       * A good fix would be to parse individual messages' slackdown
+       * to markdown, and add the additional markdown
+       * (including raw HTML tags) afterward, instead of forming a big array
+       * of slackdown messages, then converting them all into markdown at once.
+       */
+      attachments.forEach(att=> {
+        let attMessages = [];
+        if (att.pretext) {
+          messages.push(att.pretext);
+        }
+        if (att.author_name) {
+          if (att.author_link) {
+            attMessages.push(`[${att.author_name}](${att.author_link})`);
+          } else {
+            attMessages.push(`${att.author_name}`);
+          }
+        }
+        if (att.title) {
+          if (att.title_link) {
+            attMessages.push(`*[${att.title}](${att.title_link})*`);
+          } else {
+            attMessages.push(`*${att.title}*`);
+          }
+        }
+        if (att.text) {
+          attMessages.push(`${att.text}`);
+        }
+        if (att.fields) {
+          att.fields.forEach(field => {
+            if (field.title) {
+              attMessages.push(`*${field.title}*`);
+            }
+            if (field.value) {
+              attMessages.push(`${field.value}`);
+            }
+          })
+        }
+        if ((att.actions instanceof Array) && att.actions.length > 0) {
+          attMessages.push(`Actions (Unsupported): ${att.actions.map(o => `[${o.text}]`).join(" ")}`);
+        }
+        if (att.footer) {
+          attMessages.push(`_${att.footer}_`);
+        }
+        let attachmentBullet = att.color ? `;BEGIN_FONT_COLOR_HACK_${att.color};●;END_FONT_COLOR_HACK;` : "●";
+        attMessages.forEach(attMessage => {
+          messages.push(`${attachmentBullet} ${attMessage}`);
+        });
+      });
+    }
 
-    let rawMessage = messages.join('\n').trim();
+    let rawMessage =
+      messages
+        .filter(m => m && (typeof m === "string"))
+        .map(m => m.trim())
+        .join('\n')
+        .trim();
     let payload = this.getPayload(data);
 
     try {
@@ -170,13 +237,28 @@ class App extends MatrixPuppetBridgeBase {
         [':skin-tone-4:', '🏽'],
         [':skin-tone-5:', '🏾'],
         [':skin-tone-6:', '🏿'],
+        ['<!channel>', '@room'],
+          // NOTE: <!channel> is converted to @room here,
+          // and not in slacktomd, because we're translating Slack parlance
+          // to Matrix parlance, not parsing "Slackdown" to turn into Markdown.
       ];
       for (let i = 0; i < replacements.length; i++) {
         rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
       }
       rawMessage = emojione.shortnameToUnicode(rawMessage);
+      console.log("rawMessage");
+      console.log(rawMessage);
       payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
-      payload.html = converter.makeHtml(payload.text);
+      let markdown = payload.text
+      markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
+      markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
+      payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
+      payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '');
+      console.log("payload.text");
+      console.log(payload.text);
+      payload.html = converter.makeHtml(markdown);
+      console.log("payload.html");
+      console.log(payload.html);
     } catch (e) {
       console.log(e);
       debug("could not normalize message", e);
