@@ -204,8 +204,8 @@ export class Adapter extends ThirdPartyAdapter {
     
     let rawMessage =
       messages
-        .map(m => m.trim())
         .filter(m => m && (typeof m === "string"))
+        .map(m => m.trim())
         .join('\n')
         .trim();
     let payload = <ThirdPartyMessagePayload>this.getPayload(data);
