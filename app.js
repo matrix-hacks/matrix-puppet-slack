@@ -101,7 +101,7 @@ class App extends MatrixPuppetBridgeBase {
       file,
     } = data;
     let payload = { roomId: channel };
-    
+
     if (user) {
       if ( user === "USLACKBOT" ) {
         payload.senderName = user_profile.name;
@@ -265,7 +265,7 @@ class App extends MatrixPuppetBridgeBase {
       payload.text = rawMessage;
     }
 
-    
+
 
     return this.handleThirdPartyRoomMessage(payload).catch(err=>{
       console.error(err);
@@ -281,9 +281,13 @@ class App extends MatrixPuppetBridgeBase {
     const directName = (user) => this.client.getUserById(user).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
     const room = this.client.getRoomById(id);
+    var purpose = "";
+    if ((room.purpose) && room.purpose.value) {
+      purpose = room.purpose.value;
+    }
     return {
       name: room.isDirect ? directName(room.user) : room.name,
-      topic: room.isDirect ? directTopic() : room.purpose.value
+      topic: room.isDirect ? directTopic() : purpose
     }
   }
   sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
