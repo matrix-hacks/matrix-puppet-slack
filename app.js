@@ -249,7 +249,7 @@ class App extends MatrixPuppetBridgeBase {
       rawMessage = emojione.shortnameToUnicode(rawMessage);
       console.log("rawMessage");
       console.log(rawMessage);
-      payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
+      payload.text = slackdown(this, rawMessage);
       let markdown = payload.text
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');

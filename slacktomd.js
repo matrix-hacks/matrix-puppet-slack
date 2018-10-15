@@ -32,27 +32,21 @@ class slacktomd {
   }
 
   _getUser(u) {
-    var retVal = null;
-    this.users.filter(username => {
-      if (username.id === u) {
-        retVal = username.name;
-      }
-    })[0];
-    if (retVal) {
-      return '@' + retVal;
+    const user = this.app.client.getUserById(u);
+    if (user) {
+      const id = this.app.getGhostUserFromThirdPartySenderId(u);
+      // TODO: update user profile
+      return `[${user.name}](https://matrix.to/#/${id})`;
     }
     return u;
   }
 
   _getChannel(c) {
-    var retVal = null;
-    this.channels.filter(chan => {
-      if (chan.id === c) {
-        retVal = chan.name;
-      }
-    })[0];
-    if (retVal) {
-      return '#' + retVal;
+    const chan = this.app.client.getChannelById(c);
+    if (chan) {
+      const id = this.app.getRoomAliasFromThirdPartyRoomId(c);
+      // update room profile
+      return `[${chan.name}](https://matrix.to/#/${id})`;
     }
     return c;
   }
@@ -204,9 +198,8 @@ class slacktomd {
     return text;
   }
 
-  parse(text, users, channels) {
-    this.users = users;
-    this.channels = channels;
+  parse(app, text) {
+    this.app = app;
     return this._publicParse(text);
   }
 }
