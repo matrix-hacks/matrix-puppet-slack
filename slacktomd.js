@@ -37,6 +37,9 @@ class slacktomd {
       if (username.id === 'U' + u) {
         retVal = username.name;
       }
+      if (username.id === 'W' + u) {
+        retVal = username.name;
+      }
     })[0];
     if (retVal) {
       return '@' + retVal;
