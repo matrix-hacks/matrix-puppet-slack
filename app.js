@@ -238,7 +238,8 @@ class App extends MatrixPuppetBridgeBase {
         [':skin-tone-5:', '🏾'],
         [':skin-tone-6:', '🏿'],
         ['<!channel>', '@room'],
-          // NOTE: <!channel> is converted to @room here,
+        ['<!here>', '@room'],
+          // NOTE: <!channel> and `<!here> converted to @room here,
           // and not in slacktomd, because we're translating Slack parlance
           // to Matrix parlance, not parsing "Slackdown" to turn into Markdown.
       ];
