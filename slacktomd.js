@@ -34,10 +34,7 @@ class slacktomd {
   _getUser(u) {
     var retVal = null;
     this.users.filter(username => {
-      if (username.id === 'U' + u) {
-        retVal = username.name;
-      }
-      if (username.id === 'W' + u) {
+      if (username.id === u) {
         retVal = username.name;
       }
     })[0];
@@ -50,7 +47,7 @@ class slacktomd {
   _getChannel(c) {
     var retVal = null;
     this.channels.filter(chan => {
-      if (chan.id === 'C' + c) {
+      if (chan.id === c) {
         retVal = chan.name;
       }
     })[0];
@@ -67,11 +64,11 @@ class slacktomd {
       case "!":
         return this._payloads(match[1]);
       case "#":
-        p = this._payloads(match[1], 2);
+        p = this._payloads(match[1], 1);
         let c = p.length == 1 ? p[0] : p[1];
         return this._getChannel(c);
       case "@":
-        p = this._payloads(match[1], 2);
+        p = this._payloads(match[1], 1);
         let u = p.length == 1 ? p[0] : p[1];
         return this._getUser(u);
       default:
