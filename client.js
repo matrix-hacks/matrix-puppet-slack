@@ -111,13 +111,13 @@ class Client extends EventEmitter {
    * }
    **/
   getBotById(id) {
-    return this.data.bots.find(u => u.id === id) || { name: "unknown" };
+    return this.data.bots.find(u => (u.id === id || u.name === id)) || { name: "unknown" };
   }
   getUserById(id) {
-    return this.data.users.find(u => u.id === id);
+    return this.data.users.find(u => (u.id === id || u.name === id));
   }
   getChannelById(id) {
-    return this.data.channels.find(c => c.id === id);
+    return this.data.channels.find(c => (c.id === id || c.name === id));
   }
   getImById(id) {
     return this.data.ims.find(c => c.id === id);
