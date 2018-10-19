@@ -104,9 +104,10 @@ class App extends MatrixPuppetBridgeBase {
 
     if (user) {
       if ( user === "USLACKBOT" ) {
-        payload.senderName = user_profile.name;
+        const u = this.client.getUserById(user);
+        payload.senderName = u.name;
         payload.senderId = user;
-        payload.avatarUrl = user_profile.image_72;
+        payload.avatarUrl = u.profile.image_72;
       } else {
         const isMe = user === this.client.getSelfUserId();
         let uu = this.client.getUserById(user);
