@@ -63,18 +63,33 @@ class App extends MatrixPuppetBridgeBase {
           user: data.message.user
         });
       } else {
-        if (data.file) {
-          this.sendFile(data).then(() => {
-            if (data.file.initial_comment) {
-              this.createAndSendPayload({
-                channel: data.channel,
-                text: data.file.initial_comment.comment,
-                attachments: data.attachments,
-                bot_id: data.bot_id,
-                user: data.user,
-                user_profile: data.user_profile,
-              });
-            }
+        if (data.files) {
+          // TODO: should send one message if contains multiple files
+          const promises = data.files.map((file) => {
+            const d = {
+              channel: data.channel,
+              text: data.text,
+              attachments: data.attachments,
+              bot_id: data.bot_id,
+              user: data.user,
+              user_profile: data.user_profile,
+              file: file,
+            };
+            return this.sendFile(d).then(() => {
+              if (d.file.initial_comment) {
+                this.createAndSendPayload({
+                  channel: d.channel,
+                  text: d.file.initial_comment.comment,
+                  attachments: d.attachments,
+                  bot_id: d.bot_id,
+                  user: d.user,
+                  user_profile: d.user_profile,
+                });
+              }
+            });
+          });
+          Promise.all(promises).then(() => {
+            // all sent
           });
         } else {
           this.createAndSendPayload({
@@ -131,6 +146,7 @@ class App extends MatrixPuppetBridgeBase {
     let payload = this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
+    payload.path = ''; // to prevent errors
     return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
       payload.buffer = buffer;
       payload.mimetype = type;
