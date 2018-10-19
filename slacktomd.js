@@ -1,4 +1,5 @@
 "use strict";
+const config = require('./config.json');
 
 class slacktomd {
   constructor() {
@@ -32,11 +33,13 @@ class slacktomd {
   }
 
   _getUser(u) {
+    const isMe = u === this.app.client.getSelfUserId();
     const user = this.app.client.getUserById(u);
     if (user) {
-      const id = this.app.getGhostUserFromThirdPartySenderId(u);
+      const id = isMe ? config.puppet.id : this.app.getGhostUserFromThirdPartySenderId(u);
       // TODO: update user profile
-      return `[${user.name}](https://matrix.to/#/${id})`;
+      const name = isMe ? config.puppet.localpart : user.name;
+      return `[${name}](https://matrix.to/#/${id})`;
     }
     return u;
   }
