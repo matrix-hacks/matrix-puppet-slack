@@ -15,13 +15,26 @@ class mdtoslack {
   }
 
   _getChannel(c) {
-    const chan = this.app.client.getChannelById(c);
-    if (chan) {
-      const id = this.app.getRoomAliasFromThirdPartyRoomId(c);
-      // update room profile
-      return `[${chan.name}](https://matrix.to/#/${id})`;
+    let chanid;
+    try {
+      chanid = this.app.getThirdPartyRoomIdFromMatrixRoomId(c);
+    } catch (e) {
+      // fallback copy & modify from getThirdPartyUserIdFromMatrixGhostId of matrix-puppet-bridge
+      const svcPrefix = this.app.getServicePrefix();
+      const domain = this.app.domain;
+      const patt = new RegExp(`^#${svcPrefix}_(.+)$`);
+      const localpart = c.replace(':'+domain, '');
+      const matches = localpart.match(patt);
+      if (!matches || !matches[1]) {
+        return c;
+      }
+      chanid = matches[1];
     }
-    return c;
+    const chan = this.app.client.getChannelById(chanid);
+    if (!chan) {
+      return c;
+    }
+    return `<#${chan.id}|${chan.name}>`;
   }
 
   _matchMention(match) {
@@ -91,17 +104,26 @@ if (!module.parent) {
       name: 'slackbot',
     },
   };
+  const CHANS = {
+    'test': {
+      id: 'CTEST0000',
+      name: 'test',
+    },
+  }
   const app = {
     client: {
-      getChannelById: () => {},
+      getChannelById: (id) => CHANS[id],
       getUserById: (id) => USERS[id],
       getSelfUserId: (id) => {},
     },
+    domain: 'matrix',
+    getServicePrefix: () => 'slack_FOO',
     getThirdPartyUserIdFromMatrixGhostId: (id) => MX_TP[id],
   }
   const parser = new mdtoslack();
   console.log(parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)'));
   console.log(parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix): [slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)'));
+  console.log(parser.parse(app, '[#test](https://matrix.to/#/#slack_FOO_test:matrix)'));
 } else {
   module.exports = mdtoslack;
 }
