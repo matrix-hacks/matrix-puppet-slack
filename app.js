@@ -2,6 +2,7 @@ const debug = require('debug')('matrix-puppet:slack:app');
 const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
 const SlackClient = require('./client');
 const slackdown = require('./slackdown');
+const mxtoslack = require('./mxtoslack');
 const showdown  = require('showdown');
 const emojione = require('emojione')
 const converter = new showdown.Converter({
@@ -293,9 +294,26 @@ class App extends MatrixPuppetBridgeBase {
   sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
     // not available for now
   }
-  sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
+  sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
     debug('sending message as puppet to third party room with id', id);
-    return this.client.sendMessage(text, id);
+    // text lost html informations, just use raw message instead that.
+    const rawMessage = data.content.formatted_body || data.content.body;
+
+    console.log("rawMessage");
+    console.log(rawMessage);
+
+    let message = mxtoslack(this, rawMessage);
+
+    const replacements = [
+      ['@room', '<!channel>'],
+    ]
+    for (let i = 0; i < replacements.length; i++) {
+      message = message.replace(replacements[i][0], replacements[i][1]);
+    }
+    // deduplicate
+    message = this.tagMatrixMessage(message);
+
+    return this.client.sendMessage(message, id);
   }
   sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
     return this.client.sendImageMessage(data.url, data.text, id);

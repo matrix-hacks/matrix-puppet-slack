@@ -18,6 +18,7 @@
     "matrix-puppet-bridge": "matrix-hacks/matrix-puppet-bridge#344fcc5",
     "mime-types": "^2.1.14",
     "needle": "^1.4.5",
-    "showdown": "^1.6.4"
+    "showdown": "^1.6.4",
+    "turndown": "^5.0.1"
   }
 }
