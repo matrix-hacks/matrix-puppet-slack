@@ -50,7 +50,7 @@ class mdtoslack {
       return text;
     }
     const patterns = [
-      {p: /\[(.+)\]\(https:\/\/matrix.to\/\#\/(.+)\)/g, cb: 'mention'},
+      {p: /\[([^\]]+)\]\(https:\/\/matrix.to\/\#\/([^)]+)\)/g, cb: 'mention'},
     ];
     for (let p = 0; p < patterns.length; p++) {
       let pattern = patterns[p],
