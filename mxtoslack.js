@@ -4,7 +4,30 @@ const TurndownService = require('turndown');
 const parser = new mdtoslack();
 
 const turndown = TurndownService({
-  codeBlockStyle: 'fenced',
+  codeBlockStyle: 'fenced_mod',
+});
+
+// copy from https://github.com/domchristie/turndown/pull/228
+turndown.addRule('removeTrailingFencedCodeBlock', {
+  filter: function (node, options) {
+    return (
+      options.codeBlockStyle === 'fenced_mod' &&
+      node.nodeName === 'PRE' &&
+      node.firstChild &&
+      node.firstChild.nodeName === 'CODE'
+    )
+  },
+
+  replacement: function (content, node, options) {
+    var className = node.firstChild.className || ''
+    var language = (className.match(/language-(\S+)/) || [null, ''])[1]
+
+    return (
+      '\n\n' + options.fence + language + '\n' +
+      node.firstChild.textContent.replace(/^\s+|\s+$/g, '') +
+      '\n' + options.fence + '\n\n'
+    )
+  }
 });
 
 const mxtoslack = function(app, msg) {
