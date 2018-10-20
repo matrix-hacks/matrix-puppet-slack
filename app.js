@@ -11,11 +11,12 @@ const converter = new showdown.Converter({
 });
 
 class App extends MatrixPuppetBridgeBase {
-  setSlackTeam(teamName, userAccessToken) {
+  setSlackTeam(teamName, userAccessToken, notify) {
     this.teamName = teamName;
     this.userAccessToken = userAccessToken;
     this.slackPrefix = 'slack';
     this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
+    this.notifyToSlack = notify;
   }
   getServiceName() {
     return "Slack";
@@ -305,7 +306,7 @@ class App extends MatrixPuppetBridgeBase {
     let message = mxtoslack(this, rawMessage);
 
     const replacements = [
-      ['@room', '<!channel>'],
+      ['@room', this.notifyToSlack !== 'only_active' ? '<!channel>' : '<!here>'],
     ]
     for (let i = 0; i < replacements.length; i++) {
       message = message.replace(replacements[i][0], replacements[i][1]);

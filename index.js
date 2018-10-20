@@ -100,7 +100,7 @@ new Cli({
     }).then(()=>{
       return Promise.mapSeries(config.slack, (team) => {
         const app = new App(config, puppet, bridge);
-        app.setSlackTeam(team.team_name, team.user_access_token);
+        app.setSlackTeam(team.team_name, team.user_access_token, team.notify);
         debug('initing teams');
         return app.initThirdPartyClient().then(() => {
           debug('team success');
