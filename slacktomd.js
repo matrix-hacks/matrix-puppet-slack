@@ -1,4 +1,5 @@
 "use strict";
+const config = require('./config.json');
 
 class slacktomd {
   constructor() {
@@ -32,27 +33,23 @@ class slacktomd {
   }
 
   _getUser(u) {
-    var retVal = null;
-    this.users.filter(username => {
-      if (username.id === 'U' + u) {
-        retVal = username.name;
-      }
-    })[0];
-    if (retVal) {
-      return '@' + retVal;
+    const isMe = u === this.app.client.getSelfUserId();
+    const user = this.app.client.getUserById(u);
+    if (user) {
+      const id = isMe ? config.puppet.id : this.app.getGhostUserFromThirdPartySenderId(u);
+      // TODO: update user profile
+      const name = isMe ? config.puppet.localpart : user.name;
+      return `[${name}](https://matrix.to/#/${id})`;
     }
     return u;
   }
 
   _getChannel(c) {
-    var retVal = null;
-    this.channels.filter(chan => {
-      if (chan.id === 'C' + c) {
-        retVal = chan.name;
-      }
-    })[0];
-    if (retVal) {
-      return '#' + retVal;
+    const chan = this.app.client.getChannelById(c);
+    if (chan) {
+      const id = this.app.getRoomAliasFromThirdPartyRoomId(c);
+      // update room profile
+      return `[${chan.name}](https://matrix.to/#/${id})`;
     }
     return c;
   }
@@ -64,11 +61,11 @@ class slacktomd {
       case "!":
         return this._payloads(match[1]);
       case "#":
-        p = this._payloads(match[1], 2);
+        p = this._payloads(match[1], 1);
         let c = p.length == 1 ? p[0] : p[1];
         return this._getChannel(c);
       case "@":
-        p = this._payloads(match[1], 2);
+        p = this._payloads(match[1], 1);
         let u = p.length == 1 ? p[0] : p[1];
         return this._getUser(u);
       default:
@@ -204,9 +201,8 @@ class slacktomd {
     return text;
   }
 
-  parse(text, users, channels) {
-    this.users = users;
-    this.channels = channels;
+  parse(app, text) {
+    this.app = app;
     return this._publicParse(text);
   }
 }

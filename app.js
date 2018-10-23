@@ -63,18 +63,33 @@ class App extends MatrixPuppetBridgeBase {
           user: data.message.user
         });
       } else {
-        if (data.file) {
-          this.sendFile(data).then(() => {
-            if (data.file.initial_comment) {
-              this.createAndSendPayload({
-                channel: data.channel,
-                text: data.file.initial_comment.comment,
-                attachments: data.attachments,
-                bot_id: data.bot_id,
-                user: data.user,
-                user_profile: data.user_profile,
-              });
-            }
+        if (data.files) {
+          // TODO: should send one message if contains multiple files
+          const promises = data.files.map((file) => {
+            const d = {
+              channel: data.channel,
+              text: data.text,
+              attachments: data.attachments,
+              bot_id: data.bot_id,
+              user: data.user,
+              user_profile: data.user_profile,
+              file: file,
+            };
+            return this.sendFile(d).then(() => {
+              if (d.file.initial_comment) {
+                this.createAndSendPayload({
+                  channel: d.channel,
+                  text: d.file.initial_comment.comment,
+                  attachments: d.attachments,
+                  bot_id: d.bot_id,
+                  user: d.user,
+                  user_profile: d.user_profile,
+                });
+              }
+            });
+          });
+          Promise.all(promises).then(() => {
+            // all sent
           });
         } else {
           this.createAndSendPayload({
@@ -104,9 +119,10 @@ class App extends MatrixPuppetBridgeBase {
 
     if (user) {
       if ( user === "USLACKBOT" ) {
-        payload.senderName = user_profile.name;
+        const u = this.client.getUserById(user);
+        payload.senderName = u.name;
         payload.senderId = user;
-        payload.avatarUrl = user_profile.image_72;
+        payload.avatarUrl = u.profile.image_72;
       } else {
         const isMe = user === this.client.getSelfUserId();
         let uu = this.client.getUserById(user);
@@ -130,6 +146,7 @@ class App extends MatrixPuppetBridgeBase {
     let payload = this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
+    payload.path = ''; // to prevent errors
     return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
       payload.buffer = buffer;
       payload.mimetype = type;
@@ -238,7 +255,8 @@ class App extends MatrixPuppetBridgeBase {
         [':skin-tone-5:', '🏾'],
         [':skin-tone-6:', '🏿'],
         ['<!channel>', '@room'],
-          // NOTE: <!channel> is converted to @room here,
+        ['<!here>', '@room'],
+          // NOTE: <!channel> and `<!here> converted to @room here,
           // and not in slacktomd, because we're translating Slack parlance
           // to Matrix parlance, not parsing "Slackdown" to turn into Markdown.
       ];
@@ -248,7 +266,7 @@ class App extends MatrixPuppetBridgeBase {
       rawMessage = emojione.shortnameToUnicode(rawMessage);
       console.log("rawMessage");
       console.log(rawMessage);
-      payload.text = slackdown(rawMessage, this.client.getUsers(), this.client.getChannels());
+      payload.text = slackdown(this, rawMessage);
       let markdown = payload.text
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
