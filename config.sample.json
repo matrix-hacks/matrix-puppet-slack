@@ -1,7 +1,8 @@
 {
   "slack": [{
     "team_name": "<slack team name>",
-    "user_access_token": "<slack 'test' token>"
+    "user_access_token": "<slack 'test' token>",
+    "notify": "only_active"
   }],
   "registrationPath": "slack-registration.yaml",
   "port": 8090,
