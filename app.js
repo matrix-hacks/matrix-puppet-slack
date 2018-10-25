@@ -58,52 +58,56 @@ class App extends MatrixPuppetBridgeBase {
   registerMessageListener() {
     this.client.on('message', (data)=>{
       console.log(data);
+      // edit message
       if (data.subtype === "message_changed") {
         this.createAndSendPayload({
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
           user: data.message.user
         });
-      } else {
-        if (data.files) {
-          // TODO: should send one message if contains multiple files
-          const promises = data.files.map((file) => {
-            const d = {
-              channel: data.channel,
-              text: data.text,
-              attachments: data.attachments,
-              bot_id: data.bot_id,
-              user: data.user,
-              user_profile: data.user_profile,
-              file: file,
-            };
-            return this.sendFile(d).then(() => {
-              if (d.file.initial_comment) {
-                this.createAndSendPayload({
-                  channel: d.channel,
-                  text: d.file.initial_comment.comment,
-                  attachments: d.attachments,
-                  bot_id: d.bot_id,
-                  user: d.user,
-                  user_profile: d.user_profile,
-                });
-              }
-            });
-          });
-          Promise.all(promises).then(() => {
-            // all sent
-          });
-        } else {
-          this.createAndSendPayload({
+        return;
+      }
+      if (data.files) {
+        // TODO: should send one message if contains multiple files
+        const promises = data.files.map((file) => {
+          const d = {
             channel: data.channel,
             text: data.text,
             attachments: data.attachments,
             bot_id: data.bot_id,
             user: data.user,
             user_profile: data.user_profile,
+            file: file,
+          };
+          return this.sendFile(d).then(() => {
+            if (d.file.initial_comment) {
+              this.createAndSendPayload({
+                channel: d.channel,
+                text: d.file.initial_comment.comment,
+                attachments: d.attachments,
+                bot_id: d.bot_id,
+                user: d.user,
+                user_profile: d.user_profile,
+              });
+            }
           });
-        }
+        });
+        // if data has text and nobody send this text, we need to send
+        // the message manually
+        Promise.all(promises).then(() => {
+          // all sent
+        });
+        return;
       }
+      // normal message
+      this.createAndSendPayload({
+        channel: data.channel,
+        text: data.text,
+        attachments: data.attachments,
+        bot_id: data.bot_id,
+        user: data.user,
+        user_profile: data.user_profile,
+      });
     });
     this.client.on('typing', (data)=>{
       console.log(data);
