@@ -105,6 +105,22 @@ class Client extends EventEmitter {
               }
             }
             break;
+          case 'bot_added':
+          case 'bot_changed':
+            {
+              let found = false;
+              for (let i = 0; i < this.data.bots.length; i++) {
+                if (this.data.bots[i].id == data.bot.id) {
+                  this.data.bots[i] = data.bot;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                this.data.bots.push(data.bot);
+              }
+            }
+            break;
           case 'reconnect_url':
           case 'pong':
             // ignore
