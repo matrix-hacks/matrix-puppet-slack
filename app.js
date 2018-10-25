@@ -105,6 +105,13 @@ class App extends MatrixPuppetBridgeBase {
         }
       }
     });
+    this.client.on('typing', (data)=>{
+      console.log(data);
+      this.createAndSendTypingEvent({
+        channel: data.channel,
+        user: data.user,
+      });
+    });
     debug('registered message listener');
   }
   getPayload(data) {
@@ -288,6 +295,22 @@ class App extends MatrixPuppetBridgeBase {
 
 
     return this.handleThirdPartyRoomMessage(payload).catch(err=>{
+      console.error(err);
+      this.sendStatusMsg({
+        fixedWidthOutput: true,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, err.stack).catch((err)=>{
+        console.error(err);
+      });
+    });
+  }
+  createAndSendTypingEvent(data) {
+    const payload = this.getPayload(data);
+    return this.getIntentFromThirdPartySenderId(payload.senderId).then(ghostIntent => {
+      return this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId).then(matrixRoomId => {
+        return ghostIntent.sendTyping(matrixRoomId, true);
+      });
+    }).catch(err=>{
       console.error(err);
       this.sendStatusMsg({
         fixedWidthOutput: true,

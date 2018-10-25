@@ -105,6 +105,10 @@ class Client extends EventEmitter {
               }
             }
             break;
+          case 'user_typing':
+            debug('emitting typing message:', data);
+            this.emit('typing', data);
+            break;
           case 'bot_added':
           case 'bot_changed':
             {
