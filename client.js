@@ -58,33 +58,42 @@ class Client extends EventEmitter {
       this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
         let data = JSON.parse(payload);
         //console.log(data);
-        if ( data.type === "message" ) {
-          debug('emitting message:', data);
-          this.emit('message', data);
-        } else if (data.type === 'channel_joined') {
-          this.data.channels.push(data.channel);
-        } else if (data.type === 'group_joined') {
-          this.data.channels.push(data.channel);
-        } else if (data.type === 'reconnect_url') {
-          // ignore
-        } else if (data.type === 'pong') {
-          // ignore
-        } else if (data.type === 'team_join') {
-          this.data.users.push(data.user);
-        } else if (data.type === 'user_change') {
-          let found = false;
-          for (let i = 0; i < this.data.users.length; i++) {
-            if (this.data.users[i].id == data.user.id) {
-              this.data.users[i] = data.user;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
+        switch (data.type) {
+          case 'message':
+            debug('emitting message:', data);
+            this.emit('message', data);
+            break;
+          case 'channel_joined':
+            this.data.channels.push(data.channel);
+            break;
+          case 'group_joined':
+            this.data.channels.push(data.channel);
+            break;
+          case 'team_join':
             this.data.users.push(data.user);
-          }
-        } else {
-          debug('raw message, type:', data.type);
+            break;
+          case 'user_change':
+            {
+              let found = false;
+              for (let i = 0; i < this.data.users.length; i++) {
+                if (this.data.users[i].id == data.user.id) {
+                  this.data.users[i] = data.user;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                this.data.users.push(data.user);
+              }
+            }
+            break;
+          case 'reconnect_url':
+          case 'pong':
+            // ignore
+            break;
+          default:
+            debug('raw message, type:', data.type);
+            break;
         }
       });
 
