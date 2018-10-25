@@ -74,6 +74,19 @@ class Client extends EventEmitter {
               }
             }
             break;
+          case 'channel_rename':
+          case 'group_rename':
+            {
+              let chan = this.getChannelById(data.channel.id);
+              if (!chan) {
+                this.data.channels.push(data.channel);
+                chan = data.channel;
+              }
+              if (chan.name !== data.channel.name) {
+                chan.name = data.channel.name;
+              }
+            }
+            break;
           case 'team_join':
             this.data.users.push(data.user);
             break;
