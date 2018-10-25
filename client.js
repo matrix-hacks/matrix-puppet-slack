@@ -64,10 +64,15 @@ class Client extends EventEmitter {
             this.emit('message', data);
             break;
           case 'channel_joined':
-            this.data.channels.push(data.channel);
-            break;
           case 'group_joined':
-            this.data.channels.push(data.channel);
+          case 'mipm_joined':
+          case 'im_created':
+            {
+              const chan = this.getChannelById(data.channel.id);
+              if (!chan) {
+                this.data.channels.push(data.channel);
+              }
+            }
             break;
           case 'team_join':
             this.data.users.push(data.user);
