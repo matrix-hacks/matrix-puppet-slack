@@ -316,12 +316,17 @@ class App extends MatrixPuppetBridgeBase {
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
     debug('sending message as puppet to third party room with id', id);
     // text lost html informations, just use raw message instead that.
-    const rawMessage = data.content.formatted_body || data.content.body;
+    let message;
+    if (data.content.format === 'org.matrix.custom.html') {
+      const rawMessage = data.content.formatted_body;
 
-    console.log("rawMessage");
-    console.log(rawMessage);
+      console.log("rawMessage");
+      console.log(rawMessage);
 
-    let message = mxtoslack(this, rawMessage);
+      message = mxtoslack(this, rawMessage);
+    } else {
+      message = data.content.body;
+    }
 
     const replacements = [
       ['@room', this.notifyToSlack !== 'only_active' ? '<!channel>' : '<!here>'],
