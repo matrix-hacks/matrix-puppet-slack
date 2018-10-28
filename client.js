@@ -14,7 +14,6 @@ class Client extends EventEmitter {
       self: {},
       channels: [],
       users: [],
-      ims: []
     }
   }
   connect() {
@@ -46,7 +45,9 @@ class Client extends EventEmitter {
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
         this.data = rtmStartData;
-        this.data.channels = this.data.channels.concat(this.data.groups); // we want the hidden channels, "groups", too!
+        this.data.channels = this.data.channels
+          .concat(this.data.groups) // we want the hidden channels, "groups", too!
+          .concat(this.data.ims); // also we want the im channels, "ims"
       });
 
       // you need to wait for the client to fully connect before you can send messages
@@ -164,25 +165,23 @@ class Client extends EventEmitter {
     return this.data.users.find(u => (u.id === id || u.name === id));
   }
   getChannelById(id) {
-    return this.data.channels.find(c => (c.id === id || c.name === id));
-  }
-  getImById(id) {
-    return this.data.ims.find(c => c.id === id);
+    const chan = this.getRoomById(id);
+    if (!chan || chan.isDirect) {
+      return null;
+    }
+    return chan;
   }
   // get "room" by id will check for channel or IM and hide the details of that difference
   // but pass that detail along in case the callee cares.
   getRoomById(id) {
-    let channel = this.getChannelById(id);
-    if ( channel ) {
-      channel.isDirect = false;
-      return channel;
+    const chan = this.data.channels.find(c => (c.id === id || c.name === id));
+    if (!chan) {
+      return null;
     }
-    let im = this.getImById(id);
-    if ( im ) {
-      im.isDirect = true;
-      return im;
+    if (chan.isDirect === undefined) {
+      chan.isDirect = !!chan.is_im;
     }
-    return null;
+    return chan;
   }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);
