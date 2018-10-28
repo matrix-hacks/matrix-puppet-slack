@@ -68,8 +68,18 @@ class App extends MatrixPuppetBridgeBase {
         return;
       }
       if (data.files) {
-        // TODO: should send one message if contains multiple files
-        const promises = data.files.map((file) => {
+        const promises = [];
+        if (data.text) {
+          promises.push(this.createAndSendPayload({
+            channel: data.channel,
+            text: data.text,
+            attachments: data.attachments,
+            bot_id: data.bot_id,
+            user: data.user,
+            user_profile: data.user_profile,
+          }));
+        }
+        data.files.forEach((file) => {
           const d = {
             channel: data.channel,
             text: data.text,
@@ -79,9 +89,9 @@ class App extends MatrixPuppetBridgeBase {
             user_profile: data.user_profile,
             file: file,
           };
-          return this.sendFile(d).then(() => {
+          promises.push(this.sendFile(d).then(() => {
             if (d.file.initial_comment) {
-              this.createAndSendPayload({
+              return this.createAndSendPayload({
                 channel: d.channel,
                 text: d.file.initial_comment.comment,
                 attachments: d.attachments,
@@ -90,12 +100,16 @@ class App extends MatrixPuppetBridgeBase {
                 user_profile: d.user_profile,
               });
             }
-          });
+          }));
         });
-        // if data has text and nobody send this text, we need to send
-        // the message manually
-        Promise.all(promises).then(() => {
-          // all sent
+        Promise.all(promises).catch(err=>{
+          console.error(err);
+          this.sendStatusMsg({
+            fixedWidthOutput: true,
+            roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+          }, err.stack).catch((err)=>{
+            console.error(err);
+          });
         });
         return;
       }
