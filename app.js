@@ -326,7 +326,14 @@ class App extends MatrixPuppetBridgeBase {
     const payload = this.getPayload(data);
     return this.getIntentFromThirdPartySenderId(payload.senderId).then(ghostIntent => {
       return this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId).then(matrixRoomId => {
-        return ghostIntent.sendTyping(matrixRoomId, true);
+        // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
+        // client can get timeout value, but intent does not support this yet.
+        //return ghostIntent.sendTyping(matrixRoomId, true);
+        return ghostIntent._ensureJoined(matrixRoomId).then(function() {
+          return ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
+        }).then(function() {
+          return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
+        });
       });
     }).catch(err=>{
       console.error(err);
