@@ -66,7 +66,7 @@ class Client extends EventEmitter {
             break;
           case 'channel_joined':
           case 'group_joined':
-          case 'mipm_joined':
+          case 'mpim_joined':
           case 'im_created':
             {
               const chan = this.getChannelById(data.channel.id);
