@@ -47,15 +47,18 @@ Restart your HS.
   - [ ] Initiating
  - Matrix -> Slack
    - [x] Text content
-   - [x] Image content
+   - [x] Formatted Text content
+   - [ ] Image content
    - [ ] Audio/Video content
-   - [ ] Typing notifs
+   - [x] Typing notifs
    - [ ] User Profiles
  - Slack -> Matrix
    - [x] Text content
+   - [x] Formatted Text content
    - [x] Image/Audio/Video content as protected link to slack
    - [x] Image/Audio/Video content as upload & embed to matrix
-   - [ ] Typing notifs
+   - [x] Image/Audio/Video content message text
+   - [x] Typing notifs
    - [ ] User Profiles
    - [ ] Presence
  - [x] Third Party Lookup
