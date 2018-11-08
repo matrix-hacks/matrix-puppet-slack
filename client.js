@@ -14,7 +14,6 @@ class Client extends EventEmitter {
       self: {},
       channels: [],
       users: [],
-      ims: []
     }
   }
   connect() {
@@ -46,7 +45,9 @@ class Client extends EventEmitter {
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
         this.data = rtmStartData;
-        this.data.channels = this.data.channels.concat(this.data.groups); // we want the hidden channels, "groups", too!
+        this.data.channels = this.data.channels
+          .concat(this.data.groups) // we want the hidden channels, "groups", too!
+          .concat(this.data.ims); // also we want the im channels, "ims"
       });
 
       // you need to wait for the client to fully connect before you can send messages
@@ -58,33 +59,80 @@ class Client extends EventEmitter {
       this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
         let data = JSON.parse(payload);
         //console.log(data);
-        if ( data.type === "message" ) {
-          debug('emitting message:', data);
-          this.emit('message', data);
-        } else if (data.type === 'channel_joined') {
-          this.data.channels.push(data.channel);
-        } else if (data.type === 'group_joined') {
-          this.data.channels.push(data.channel);
-        } else if (data.type === 'reconnect_url') {
-          // ignore
-        } else if (data.type === 'pong') {
-          // ignore
-        } else if (data.type === 'team_join') {
-          this.data.users.push(data.user);
-        } else if (data.type === 'user_change') {
-          let found = false;
-          for (let i = 0; i < this.data.users.length; i++) {
-            if (this.data.users[i].id == data.user.id) {
-              this.data.users[i] = data.user;
-              found = true;
-              break;
+        switch (data.type) {
+          case 'message':
+            debug('emitting message:', data);
+            this.emit('message', data);
+            break;
+          case 'channel_joined':
+          case 'group_joined':
+          case 'mpim_joined':
+          case 'im_created':
+            {
+              const chan = this.getChannelById(data.channel.id);
+              if (!chan) {
+                this.data.channels.push(data.channel);
+              }
             }
-          }
-          if (!found) {
+            break;
+          case 'channel_rename':
+          case 'group_rename':
+            {
+              let chan = this.getChannelById(data.channel.id);
+              if (!chan) {
+                this.data.channels.push(data.channel);
+                chan = data.channel;
+              }
+              if (chan.name !== data.channel.name) {
+                chan.name = data.channel.name;
+              }
+            }
+            break;
+          case 'team_join':
             this.data.users.push(data.user);
-          }
-        } else {
-          debug('raw message, type:', data.type);
+            break;
+          case 'user_change':
+            {
+              let found = false;
+              for (let i = 0; i < this.data.users.length; i++) {
+                if (this.data.users[i].id == data.user.id) {
+                  this.data.users[i] = data.user;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                this.data.users.push(data.user);
+              }
+            }
+            break;
+          case 'user_typing':
+            debug('emitting typing message:', data);
+            this.emit('typing', data);
+            break;
+          case 'bot_added':
+          case 'bot_changed':
+            {
+              let found = false;
+              for (let i = 0; i < this.data.bots.length; i++) {
+                if (this.data.bots[i].id == data.bot.id) {
+                  this.data.bots[i] = data.bot;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                this.data.bots.push(data.bot);
+              }
+            }
+            break;
+          case 'reconnect_url':
+          case 'pong':
+            // ignore
+            break;
+          default:
+            debug('raw message, type:', data.type);
+            break;
         }
       });
 
@@ -117,25 +165,23 @@ class Client extends EventEmitter {
     return this.data.users.find(u => (u.id === id || u.name === id));
   }
   getChannelById(id) {
-    return this.data.channels.find(c => (c.id === id || c.name === id));
-  }
-  getImById(id) {
-    return this.data.ims.find(c => c.id === id);
+    const chan = this.getRoomById(id);
+    if (!chan || chan.isDirect) {
+      return null;
+    }
+    return chan;
   }
   // get "room" by id will check for channel or IM and hide the details of that difference
   // but pass that detail along in case the callee cares.
   getRoomById(id) {
-    let channel = this.getChannelById(id);
-    if ( channel ) {
-      channel.isDirect = false;
-      return channel;
+    const chan = this.data.channels.find(c => (c.id === id || c.name === id));
+    if (!chan) {
+      return null;
     }
-    let im = this.getImById(id);
-    if ( im ) {
-      im.isDirect = true;
-      return im;
+    if (chan.isDirect === undefined) {
+      chan.isDirect = !!chan.is_im;
     }
-    return null;
+    return chan;
   }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);

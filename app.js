@@ -58,52 +58,77 @@ class App extends MatrixPuppetBridgeBase {
   registerMessageListener() {
     this.client.on('message', (data)=>{
       console.log(data);
+      // edit message
       if (data.subtype === "message_changed") {
         this.createAndSendPayload({
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
           user: data.message.user
         });
-      } else {
-        if (data.files) {
-          // TODO: should send one message if contains multiple files
-          const promises = data.files.map((file) => {
-            const d = {
-              channel: data.channel,
-              text: data.text,
-              attachments: data.attachments,
-              bot_id: data.bot_id,
-              user: data.user,
-              user_profile: data.user_profile,
-              file: file,
-            };
-            return this.sendFile(d).then(() => {
-              if (d.file.initial_comment) {
-                this.createAndSendPayload({
-                  channel: d.channel,
-                  text: d.file.initial_comment.comment,
-                  attachments: d.attachments,
-                  bot_id: d.bot_id,
-                  user: d.user,
-                  user_profile: d.user_profile,
-                });
-              }
-            });
-          });
-          Promise.all(promises).then(() => {
-            // all sent
-          });
-        } else {
-          this.createAndSendPayload({
+        return;
+      }
+      if (data.files) {
+        const promises = [];
+        if (data.text) {
+          promises.push(this.createAndSendPayload({
             channel: data.channel,
             text: data.text,
             attachments: data.attachments,
             bot_id: data.bot_id,
             user: data.user,
             user_profile: data.user_profile,
-          });
+          }));
         }
+        data.files.forEach((file) => {
+          const d = {
+            channel: data.channel,
+            text: data.text,
+            attachments: data.attachments,
+            bot_id: data.bot_id,
+            user: data.user,
+            user_profile: data.user_profile,
+            file: file,
+          };
+          promises.push(this.sendFile(d).then(() => {
+            if (d.file.initial_comment) {
+              return this.createAndSendPayload({
+                channel: d.channel,
+                text: d.file.initial_comment.comment,
+                attachments: d.attachments,
+                bot_id: d.bot_id,
+                user: d.user,
+                user_profile: d.user_profile,
+              });
+            }
+          }));
+        });
+        Promise.all(promises).catch(err=>{
+          console.error(err);
+          this.sendStatusMsg({
+            fixedWidthOutput: true,
+            roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+          }, err.stack).catch((err)=>{
+            console.error(err);
+          });
+        });
+        return;
       }
+      // normal message
+      this.createAndSendPayload({
+        channel: data.channel,
+        text: data.text,
+        attachments: data.attachments,
+        bot_id: data.bot_id,
+        user: data.user,
+        user_profile: data.user_profile,
+      });
+    });
+    this.client.on('typing', (data)=>{
+      console.log(data);
+      this.createAndSendTypingEvent({
+        channel: data.channel,
+        user: data.user,
+      });
     });
     debug('registered message listener');
   }
@@ -288,6 +313,29 @@ class App extends MatrixPuppetBridgeBase {
 
 
     return this.handleThirdPartyRoomMessage(payload).catch(err=>{
+      console.error(err);
+      this.sendStatusMsg({
+        fixedWidthOutput: true,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, err.stack).catch((err)=>{
+        console.error(err);
+      });
+    });
+  }
+  createAndSendTypingEvent(data) {
+    const payload = this.getPayload(data);
+    return this.getIntentFromThirdPartySenderId(payload.senderId).then(ghostIntent => {
+      return this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId).then(matrixRoomId => {
+        // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
+        // client can get timeout value, but intent does not support this yet.
+        //return ghostIntent.sendTyping(matrixRoomId, true);
+        return ghostIntent._ensureJoined(matrixRoomId).then(function() {
+          return ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
+        }).then(function() {
+          return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
+        });
+      });
+    }).catch(err=>{
       console.error(err);
       this.sendStatusMsg({
         fixedWidthOutput: true,
