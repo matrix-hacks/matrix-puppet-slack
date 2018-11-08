@@ -50,7 +50,7 @@ Restart your HS.
    - [x] Formatted Text content
    - [ ] Image content
    - [ ] Audio/Video content
-   - [x] Typing notifs
+   - [ ] Typing notifs
    - [ ] User Profiles
  - Slack -> Matrix
    - [x] Text content
