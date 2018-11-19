@@ -216,6 +216,22 @@ class Client extends EventEmitter {
       });
     });
   }
+  sendFileMessage(fileUrl, title, filename, channel) {
+    return new Promise((resolve, reject) => {
+      download.getBufferAndType(fileUrl).then(({ buffer }) => {
+        const opts = {
+          file: buffer,
+          title: title,
+          filetype: 'auto',
+          channels: channel,
+        };
+
+        return this.web.files.upload(filename, opts, (err, res) => {
+          err ? reject(err) : resolve(res);
+        });
+      });
+    });
+  }
   downloadImage(url) {
     return download.getBufferAndType(url, {
       headers: { Authorization: 'Bearer ' +  this.token}
