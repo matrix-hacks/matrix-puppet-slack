@@ -49,7 +49,9 @@ Restart your HS.
    - [x] Text content
    - [x] Formatted Text content
    - [ ] Image content
-   - [ ] Audio/Video content
+   - [ ] Audio (m.audio msgtype events)
+   - [ ] Video content (m.video msgtype events)
+   - [x] Generic file uploads (m.file msgtype events)
    - [ ] Typing notifs
    - [ ] User Profiles
  - Slack -> Matrix
