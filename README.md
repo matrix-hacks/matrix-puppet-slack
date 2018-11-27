@@ -48,7 +48,7 @@ Restart your HS.
  - Matrix -> Slack
    - [x] Text content
    - [x] Formatted Text content
-   - [ ] Image content
+   - [ ] Image content (m.image msgtype events)
    - [ ] Audio (m.audio msgtype events)
    - [ ] Video content (m.video msgtype events)
    - [x] Generic file uploads (m.file msgtype events)
