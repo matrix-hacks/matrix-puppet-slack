@@ -358,6 +358,46 @@ class App extends MatrixPuppetBridgeBase {
       topic: room.isDirect ? directTopic() : purpose
     }
   }
+  // HACK: copy from matrix-puppet-bridge#37
+  // and modified `filename` part.
+  // we can remove it after merge
+  handleMatrixMessageEvent(data) {
+    const { room_id, content: { body, msgtype } } = data;
+
+    if (this.isTaggedMatrixMessage(body)) {
+      return super.handleMatrixMessageEvent(data);
+    }
+    const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+    if (!thirdPartyRoomId) {
+      return super.handleMatrixMessageEvent(data);
+    }
+    const isStatusRoom = thirdPartyRoomId === this.getStatusRoomPostfix();
+    if (isStatusRoom) {
+      return super.handleMatrixMessageEvent(data);
+    }
+
+    switch (msgtype) {
+      case 'm.file':
+        {
+          const msg = this.tagMatrixMessage(body);
+          const url = this.puppet.getClient().mxcUrlToHttp(data.content.url);
+          const promise = () => this.sendFileMessageAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, {
+            url, text: msg,
+            mimetype: data.content.info.mimetype,
+            size: data.content.info.size,
+            // in normal case, `data.content.filename` is undefined,
+            // and `body` has filename
+            filename: data.content.filename || body || '',
+          }, data);
+          promise().catch(err=>{
+            this.sendStatusMsg({}, 'Error in '+this.handleMatrixEvent.name, err, data);
+          });
+        }
+        break;
+      default:
+        return super.handleMatrixMessageEvent(data);
+    }
+  }
   sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
     // not available for now
   }
@@ -389,6 +429,11 @@ class App extends MatrixPuppetBridgeBase {
   }
   sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data) {
     return this.client.sendImageMessage(data.url, data.text, id);
+  }
+  sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+    // deduplicate
+    const filename = this.tagMatrixMessage(data.filename);
+    return this.client.sendFileMessage(data.url, data.text, filename, id);
   }
 }
 
