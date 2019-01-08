@@ -64,10 +64,10 @@ class slacktomd {
         p = this._payloads(match[1], 1);
         let c = p.length == 1 ? p[0] : p[1];
         return this._getChannel(c);
-      case "@":
-        p = this._payloads(match[1], 1);
-        let u = p.length == 1 ? p[0] : p[1];
-        return this._getUser(u);
+      // case "@":
+      //   p = this._payloads(match[1], 1);
+      //   let u = p.length == 1 ? p[0] : p[1];
+      //   return this._getUser(u);
       default:
         p = this._payloads(match[1]);
         return this._markdownTag("href", p[0], (p.length == 1 ? p[0] : p[1]));

@@ -294,11 +294,29 @@ class App extends MatrixPuppetBridgeBase {
       console.log("rawMessage");
       console.log(rawMessage);
       payload.text = slackdown(this, rawMessage);
-      let markdown = payload.text
+      let markdown = payload.text;
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
       payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
       payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '');
+
+      // Replace a slack user mention.
+      // In the body it should be replaced with the nick and in the html a href.
+
+      const result = /<@(.*?)>/g.exec(payload.text);
+
+      console.log(result);
+      const isme = result[0] === this.client.getselfuserid();
+      const user = this.client.getuserbyid(u);
+      if (user) {
+          const id = isme ? config.puppet.id : this.getghostuserfromthirdpartysenderid(u);
+          // todo: update user profile
+          const name = isme ? config.puppet.localpart : user.name;
+          const mentionmd = `[${name}](https://matrix.to/#/${id})`;
+          payload.text.replace(result[0], name);
+          markdown.replace(result[0], mentionmd);
+      }
+
       console.log("payload.text");
       console.log(payload.text);
       payload.html = converter.makeHtml(markdown);
