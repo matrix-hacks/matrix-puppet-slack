@@ -201,20 +201,7 @@ class Client extends EventEmitter {
    * https://api.slack.com/docs/messages/builder
    */
   sendImageMessage(imageUrl, title, channel) {
-    return new Promise((resolve, reject) => {
-      this.web.chat.postMessage(channel, null, {
-        as_user: true,
-        attachments:[
-          {
-            fallback: title,
-            image_url: imageUrl,
-            title: title
-          }
-        ]
-      }, (err, res) => {
-        err ? reject(err) : resolve(res);
-      });
-    });
+    return this.sendFileMessage(imageUrl, title, title, channel);
   }
   sendFileMessage(fileUrl, title, filename, channel) {
     return new Promise((resolve, reject) => {
