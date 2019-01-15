@@ -1,5 +1,6 @@
 const debug = require('debug')('matrix-puppet:slack:app');
 const { MatrixPuppetBridgeBase } = require("matrix-puppet-bridge");
+const config = require('./config.json');
 const SlackClient = require('./client');
 const slackdown = require('./slackdown');
 const mxtoslack = require('./mxtoslack');
@@ -294,11 +295,34 @@ class App extends MatrixPuppetBridgeBase {
       console.log("rawMessage");
       console.log(rawMessage);
       payload.text = slackdown(this, rawMessage);
-      let markdown = payload.text
+      let markdown = payload.text;
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
       payload.text = payload.text.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '');
       payload.text = payload.text.replace(/;END_FONT_COLOR_HACK;/g, '');
+
+      // Replace a slack user mention.
+      // In the body it should be replaced with the nick and in the html a href.
+
+      let result = [];
+      while ((result = /USER_MENTION_HACK(.*?)END_USER_MENTION_HACK/g.exec(payload.text)) !== null) {
+        console.log(result);
+        const u = result[1];
+        const isme = u === this.client.getSelfUserId();
+        const user = this.client.getUserById(u);
+        if (user) {
+            const id = isme ? config.puppet.id : this.getGhostUserFromThirdPartySenderId(u);
+            // todo: update user profile
+            const name = isme ? config.puppet.localpart : user.name;
+            const mentionmd = `[${name}](https://matrix.to/#/${id})`;
+            payload.text = payload.text.replace(result[0], name);
+            markdown = markdown.replace(result[0], mentionmd);
+        } else {
+            payload.text = payload.text.replace(result[0], u);
+            markdown = markdown.replace(result[0], u);
+
+        }
+      }
       console.log("payload.text");
       console.log(payload.text);
       payload.html = converter.makeHtml(markdown);

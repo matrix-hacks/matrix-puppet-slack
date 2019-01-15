@@ -33,15 +33,10 @@ class slacktomd {
   }
 
   _getUser(u) {
-    const isMe = u === this.app.client.getSelfUserId();
-    const user = this.app.client.getUserById(u);
-    if (user) {
-      const id = isMe ? config.puppet.id : this.app.getGhostUserFromThirdPartySenderId(u);
-      // TODO: update user profile
-      const name = isMe ? config.puppet.localpart : user.name;
-      return `[${name}](https://matrix.to/#/${id})`;
-    }
-    return u;
+    // Here we want to prevent slackdown from processing the mention,
+    // but we delay the processing of the user id until app.js so that we can
+    // seperate the handling of the plain text and formatted bodies.
+    return `USER_MENTION_HACK${u}END_USER_MENTION_HACK`;
   }
 
   _getChannel(c) {
