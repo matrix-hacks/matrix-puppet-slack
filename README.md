@@ -44,19 +44,19 @@ Restart your HS.
  - [x] Channel messages
  - [x] Direct messages
   - [x] Recieving
-  - [ ] Initiating (#50)
+  - [ ] Initiating (https://github.com/matrix-hacks/matrix-puppet-slack/issues/50)
  - Matrix -> Slack
    - [x] Text content
    - [x] Formatted Text content
    - [x] Image content (m.image msgtype events)
    - [x] Generic file uploads (m.file msgtype events)
-   - [ ] Audio (m.audio msgtype events) (#66)
-   - [ ] Video content (m.video msgtype events) (#67)
+   - [ ] Audio (m.audio msgtype events) (https://github.com/matrix-hacks/matrix-puppet-slack/issues/66)
+   - [ ] Video content (m.video msgtype events) (https://github.com/matrix-hacks/matrix-puppet-slack/issues/67)
    - [ ] Typing notifications
    - [ ] Editing messages
-   - [ ] Redacting/deleting messages (#52)
+   - [ ] Redacting/deleting messages (https://github.com/matrix-hacks/matrix-puppet-slack/issues/52)
    - [ ] User Profiles
-   - [ ] /me emotes (#17)
+   - [ ] /me emotes (https://github.com/matrix-hacks/matrix-puppet-slack/issues/17)
    - [x] @-mentions
    - [x] @room, as @channel
  - Slack -> Matrix
@@ -66,13 +66,13 @@ Restart your HS.
    - [x] Image/Audio/Video content as upload & embed to matrix
    - [x] Image/Audio/Video content message text
    - [x] Typing notifications
-   - [ ] Emoji reactions (#60)
+   - [ ] Emoji reactions (https://github.com/matrix-hacks/matrix-puppet-slack/issues/60)
    - [x] Thread replies, as ordinary messages
-   - [ ] Thread replies, as Matrix replies (#58)
+   - [ ] Thread replies, as Matrix replies (https://github.com/matrix-hacks/matrix-puppet-slack/issues/58)
    - [x] Editing messages
    - [ ] Redacting/deleting messages
    - [ ] User Profiles
-   - [ ] /me emotes (#17)
+   - [ ] /me emotes (https://github.com/matrix-hacks/matrix-puppet-slack/issues/17)
    - [ ] Presence
    - [x] @-mentions
    - [ ] @channel/@here, as @room (Slack users' Matrix ghost users must have permission to @room notify in the Slack channel's Matrix ghost room; converting is not enough)
