@@ -61,6 +61,11 @@ class App extends MatrixPuppetBridgeBase {
       console.log(data);
       // edit message
       if (data.subtype === "message_changed") {
+        if (data.message.text === data.previous_message.text) {
+          // do nothing
+          debug('ignoring duplicate edit', data);
+          return;
+        }
         this.createAndSendPayload({
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
