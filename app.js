@@ -136,6 +136,13 @@ class App extends MatrixPuppetBridgeBase {
         user: data.user,
       });
     });
+    this.client.on('rename', (data)=>{
+      console.log(data);
+      // rename channel
+      this.renameChannelEvent({
+        channel: data.channel,
+      });
+    });
     debug('registered message listener');
   }
   getPayload(data) {
@@ -373,6 +380,22 @@ class App extends MatrixPuppetBridgeBase {
         console.error(err);
       });
     });
+  }
+  async renameChannelEvent(data) {
+    const payload = this.getPayload(data);
+    try {
+      const botIntent = this.getIntentFromApplicationServerBot();
+      const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
+      return botIntent.setRoomName(matrixRoomId, data.name);
+    } catch(err) {
+      console.error(err);
+      this.sendStatusMsg({
+        fixedWidthOutput: true,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, err.stack).catch((err)=>{
+        console.error(err);
+      });
+    }
   }
   getThirdPartyRoomDataById(id) {
     const directName = (user) => this.client.getUserById(user).name;
