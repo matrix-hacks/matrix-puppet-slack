@@ -15,7 +15,7 @@ class App extends MatrixPuppetBridgeBase {
   setSlackTeam(teamName, userAccessToken, notify) {
     this.teamName = teamName;
     this.userAccessToken = userAccessToken;
-    this.slackPrefix = 'slack';
+    this.slackPrefix = config.prefix;
     this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
     this.notifyToSlack = notify;
   }
