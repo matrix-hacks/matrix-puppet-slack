@@ -1,7 +1,7 @@
 {
   "slack": [{
     "team_name": "<slack team name>",
-    "user_access_token": "<slack 'test' token>",
+    "user_access_token": "<slack legacy token - generate at https://api.slack.com/custom-integrations/legacy-tokens>",
     "notify": "only_active"
   }],
   "registrationPath": "slack-registration.yaml",
