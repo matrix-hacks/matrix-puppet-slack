@@ -24,7 +24,7 @@ new Cli({
       reg.setAppServiceToken(AppServiceRegistration.generateToken());
       reg.setSenderLocalpart(`slack_bot`);
       reg.addRegexPattern("users", `@slack_.*`, true);
-      reg.addRegexPattern("aliases", `@slack_.*`, false);
+      reg.addRegexPattern("aliases", `#slack_.*`, false);
       callback(reg);
     }).catch(err=>{
       console.error(err.message);
