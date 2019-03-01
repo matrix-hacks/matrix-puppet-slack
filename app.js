@@ -392,11 +392,10 @@ class App extends MatrixPuppetBridgeBase {
 
   async renameChannelEvent(data) {
     const payload = this.getPayload(data);
+    const roomAlias = this.getRoomAliasFromThirdPartyRoomId(payload.roomId);
     try {
-      const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
-      // XXX: temporary commented.
-      // it is called in getOrCreateMatrixRoomFromThirdPartyRoomId
-      //return this._renameChannelEvent(matrixRoomId, data.name);
+      const room = await this.puppet.getClient().getRoomIdForAlias(roomAlias);
+      return this._renameChannelEvent(room.room_id, data.name);
     } catch (err) {
       console.error(err);
       this.sendStatusMsg({
