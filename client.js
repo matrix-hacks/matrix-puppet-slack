@@ -85,6 +85,10 @@ class Client extends EventEmitter {
               }
               if (chan.name !== data.channel.name) {
                 chan.name = data.channel.name;
+                this.emit('rename', {
+                  channel: chan.id,
+                  name: chan.name,
+                });
               }
             }
             break;
