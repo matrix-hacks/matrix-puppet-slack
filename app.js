@@ -18,6 +18,7 @@ class App extends MatrixPuppetBridgeBase {
     this.slackPrefix = 'slack';
     this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
     this.notifyToSlack = notify;
+    this.matrixRoomStatus = {};
   }
   getServiceName() {
     return "Slack";
@@ -134,6 +135,13 @@ class App extends MatrixPuppetBridgeBase {
       this.createAndSendTypingEvent({
         channel: data.channel,
         user: data.user,
+      });
+    });
+    this.client.on('rename', (data)=>{
+      console.log(data);
+      // rename channel
+      this.renameChannelEvent({
+        channel: data.channel,
       });
     });
     debug('registered message listener');
@@ -374,6 +382,30 @@ class App extends MatrixPuppetBridgeBase {
       });
     });
   }
+
+  async _renameChannelEvent(matrixRoomId, name) {
+    const botIntent = this.getIntentFromApplicationServerBot();
+    const ret = await botIntent.setRoomName(matrixRoomId, name);
+    this.updateRoomStatesCache(matrixRoomId, 'name', name);
+    return ret;
+  }
+
+  async renameChannelEvent(data) {
+    const payload = this.getPayload(data);
+    const roomAlias = this.getRoomAliasFromThirdPartyRoomId(payload.roomId);
+    try {
+      const room = await this.puppet.getClient().getRoomIdForAlias(roomAlias);
+      return this._renameChannelEvent(room.room_id, data.name);
+    } catch (err) {
+      console.error(err);
+      this.sendStatusMsg({
+        fixedWidthOutput: true,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, err.stack).catch((err)=>{
+        console.error(err);
+      });
+    }
+  }
   getThirdPartyRoomDataById(id) {
     const directName = (user) => this.client.getUserById(user).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
@@ -423,6 +455,44 @@ class App extends MatrixPuppetBridgeBase {
     // deduplicate
     const filename = this.tagMatrixMessage(data.filename);
     return this.client.sendFileMessage(data.url, data.text, filename, id);
+  }
+
+  async getRoomState(matrixRoomId, type) {
+    // prevent refetch from matrix server after first fetching
+    const cache = this.matrixRoomStatus[matrixRoomId] || {};
+    if (cache[type]) {
+      return cache[type];
+    }
+    const puppetClient = this.puppet.getClient();
+    switch(type) {
+      case 'name':
+        const roomName = await puppetClient.getStateEvent(matrixRoomId, 'm.room.name');
+        if (roomName && roomName.name) {
+          this.updateRoomStatesCache(matrixRoomId, 'name', roomName.name);
+        }
+        return roomName.name;
+      // TODO
+    }
+  }
+
+  updateRoomStatesCache(matrixRoomId, type, data) {
+    const roomStatus = this.matrixRoomStatus[matrixRoomId] = this.matrixRoomStatus[matrixRoomId] || {};
+    roomStatus[type] = data;
+  }
+
+  // HACK: recheck the old name when after getOrCreateMatrixRoomFromThirdPartyRoomId
+  // if room has old name, forcefully update new name after bind
+  async getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId) {
+    const matrixRoomId = await super.getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId);
+    const name = await this.getRoomState(matrixRoomId, 'name');
+    const chan = this.client.getChannelById(thirdPartyRoomId) || {};
+    if (!chan.name) {
+      return matrixRoomId;
+    }
+    if (name !== chan.name) {
+      await this._renameChannelEvent(matrixRoomId, chan.name);
+    }
+    return matrixRoomId;
   }
 }
 
