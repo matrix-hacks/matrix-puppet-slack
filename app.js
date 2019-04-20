@@ -183,7 +183,7 @@ class App extends MatrixPuppetBridgeBase {
     return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
       payload.buffer = buffer;
       payload.mimetype = type;
-      return this.handleThirdPartyRoomImageMessage(payload);
+      return this.handleThirdPartyRoomMessageWithAttachment(payload);
     }).catch((err) => {
       console.log(err);
       payload.text = '[Image] ('+data.name+') '+data.url;
