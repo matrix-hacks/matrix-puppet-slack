@@ -1,5 +1,5 @@
 const debug = require('debug')('matrix-puppet:slack:client');
-const Promise = require('bluebird');
+require('songbird');
 const EventEmitter = require('events').EventEmitter;
 const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
 const { download } = require('./utils');
@@ -212,21 +212,16 @@ class Client extends EventEmitter {
   sendImageMessage(imageUrl, title, channel) {
     return this.sendFileMessage(imageUrl, title, title, channel);
   }
-  sendFileMessage(fileUrl, title, filename, channel) {
-    return new Promise((resolve, reject) => {
-      download.getBufferAndType(fileUrl).then(({ buffer }) => {
-        const opts = {
-          file: buffer,
-          title: title,
-          filetype: 'auto',
-          channels: channel,
-        };
+  async sendFileMessage(fileUrl, title, filename, channel) {
+    const { buffer } = await download.getBufferAndType(fileUrl);
+    const opts = {
+      file: buffer,
+      title: title,
+      filetype: 'auto',
+      channels: channel,
+    };
 
-        return this.web.files.upload(filename, opts, (err, res) => {
-          err ? reject(err) : resolve(res);
-        });
-      });
-    });
+    return this.web.files.promise.upload(filename, opts);
   }
   downloadImage(url) {
     return download.getBufferAndType(url, {
