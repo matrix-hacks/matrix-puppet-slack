@@ -130,6 +130,11 @@ class Client extends EventEmitter {
               }
             }
             break;
+          case 'file_shared':
+          case 'file_unshared':
+          case 'file_public':
+          case 'file_change':
+            // TODO
           case 'reconnect_url':
           case 'pong':
             // ignore
