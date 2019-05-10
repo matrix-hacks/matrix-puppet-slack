@@ -32,9 +32,16 @@ const downloadGetBufferAndType = (url, data) => {
   });
 };
 
+const sleep = (timeout) => {
+  return new Promise((res, rej) => {
+    setTimeout(res, timeout);
+  });
+};
+
 module.exports = {
   download: {
     getStream: downloadGetStream,
     getBufferAndType: downloadGetBufferAndType,
   },
+  sleep,
 };

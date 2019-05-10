@@ -2,7 +2,7 @@ const debug = require('debug')('matrix-puppet:slack:client');
 require('songbird');
 const EventEmitter = require('events').EventEmitter;
 const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
-const { download } = require('./utils');
+const { download, sleep } = require('./utils');
 
 class Client extends EventEmitter {
   constructor(token) {

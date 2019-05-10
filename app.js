@@ -6,6 +6,7 @@ const slackdown = require('./slackdown');
 const mxtoslack = require('./mxtoslack');
 const showdown  = require('showdown');
 const emojione = require('emojione')
+const { sleep } = require('./utils');
 const converter = new showdown.Converter({
   literalMidWordUnderscores : true,
   simpleLineBreaks: true
@@ -35,27 +36,29 @@ class App extends MatrixPuppetBridgeBase {
       console.log(err);
     });
   }
-  initThirdPartyClient() {
+  async initThirdPartyClient() {
     this.client = new SlackClient(this.userAccessToken);
     this.client.on('unable-to-start', (err)=>{
       this.sendStatus(`unable to start: ${err.message}`);
     });
-    this.client.on('disconnected', ()=>{
-      this.sendStatus('disconnected. will try to reconnect in a minute...');
-      setTimeout(()=> {
-        this.initThirdPartyClient().catch((err)=>{
-          debug('reconnect failed with error', err.message);
-          this.sendStatus('reconnnect failed with error', err.message);
-        })
-      }, 60 * 1000);
+    this.client.on('disconnected', async()=>{
+      await this.sendStatus('disconnected. will try to reconnect in a minute...');
+      await sleep(60 * 1000);
+      try {
+        await this.initThirdPartyClient();
+      } catch (err) {
+        debug('reconnect failed with error', err.message);
+        await this.sendStatus('reconnnect failed with error', err.message);
+      }
     });
     this.client.on('connected', (err)=>{
       this.sendStatus(`connected`);
     });
-    return this.client.connect().then(()=>{
-      debug('waiting a little bit for initial self-messages to fire before listening for messages');
-      setTimeout(()=>this.registerMessageListener(), 5000);
-    })
+    await this.client.connect();
+    // XXX: need to wait?
+    debug('waiting a little bit for initial self-messages to fire before listening for messages');
+    await sleep(5000);
+    await this.registerMessageListener();
   }
   registerMessageListener() {
     this.client.on('message', (data)=>{
