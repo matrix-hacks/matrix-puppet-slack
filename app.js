@@ -422,6 +422,7 @@ class App extends MatrixPuppetBridgeBase {
       });
     }
   }
+
   getThirdPartyRoomDataById(id) {
     const directName = (user) => this.client.getUserById(user).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
@@ -435,9 +436,11 @@ class App extends MatrixPuppetBridgeBase {
       topic: room.isDirect ? directTopic() : purpose
     }
   }
+
   sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
     // not available for now
   }
+
   sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
     debug('sending message as puppet to third party room with id', id);
     // text lost html informations, just use raw message instead that.
@@ -445,8 +448,8 @@ class App extends MatrixPuppetBridgeBase {
     if (data.content.format === 'org.matrix.custom.html') {
       const rawMessage = data.content.formatted_body;
 
-      console.log("rawMessage");
-      console.log(rawMessage);
+      //console.log("rawMessage");
+      //console.log(rawMessage);
 
       message = mxtoslack(this, rawMessage);
     } else {
@@ -461,12 +464,13 @@ class App extends MatrixPuppetBridgeBase {
     }
     // deduplicate
     message = this.tagMatrixMessage(message);
-
     return this.client.sendMessage(message, id);
   }
+
   sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data, raw) {
     return this.client.sendImageMessage(data.url, data.text, id);
   }
+
   sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
     // deduplicate
     const filename = this.tagMatrixMessage(data.filename);
