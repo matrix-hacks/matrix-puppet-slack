@@ -195,22 +195,23 @@ class App extends MatrixPuppetBridgeBase {
     }
     return payload;
   }
-  sendFile(data) {
+  async sendFile(data) {
     let payload = this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
     payload.path = ''; // to prevent errors
-    return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
+    try {
+      const { buffer, type } = await this.client.downloadImage(data.file.url_private);
       payload.buffer = buffer;
       payload.mimetype = type;
       return this.handleThirdPartyRoomImageMessage(payload);
-    }).catch((err) => {
+    } catch (err) {
       console.log(err);
       payload.text = '[Image] ('+data.name+') '+data.url;
       return this.handleThirdPartyRoomMessage(payload);
-    });
+    }
   }
-  createAndSendPayload(data) {
+  async createAndSendPayload(data) {
     const {
       channel,
       text,
@@ -359,40 +360,43 @@ class App extends MatrixPuppetBridgeBase {
       payload.text = rawMessage;
     }
 
-
-
-    return this.handleThirdPartyRoomMessage(payload).catch(err=>{
+    try {
+      await this.handleThirdPartyRoomMessage(payload);
+    } catch (err) {
       console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
         console.error(err);
-      });
-    });
+      }
+    }
   }
-  createAndSendTypingEvent(data) {
+
+  async createAndSendTypingEvent(data) {
     const payload = this.getPayload(data);
-    return this.getIntentFromThirdPartySenderId(payload.senderId).then(ghostIntent => {
-      return this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId).then(matrixRoomId => {
-        // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
-        // client can get timeout value, but intent does not support this yet.
-        //return ghostIntent.sendTyping(matrixRoomId, true);
-        return ghostIntent._ensureJoined(matrixRoomId).then(function() {
-          return ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
-        }).then(function() {
-          return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
-        });
-      });
-    }).catch(err=>{
+    try {
+      const ghostIntent = await getIntentFromThirdPartySenderId(payload.senderId);
+      const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
+      // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
+      // client can get timeout value, but intent does not support this yet.
+      //return ghostIntent.sendTyping(matrixRoomId, true);
+      await ghostIntent._ensureJoined(matrixRoomId);
+      await ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
+      return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
+    } catch (err) {
       console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
         console.error(err);
-      });
-    });
+      }
+    }
   }
 
   async _renameChannelEvent(matrixRoomId, name) {
