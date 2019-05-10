@@ -27,14 +27,16 @@ class App extends MatrixPuppetBridgeBase {
   getServicePrefix() {
     return this.servicePrefix;
   }
-  sendStatus(_msg) {
+  async sendStatus(_msg) {
     let msg = `${this.teamName}: ${_msg}`
-    this.sendStatusMsg({
-      fixedWidthOutput: false,
-      roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-    }, msg).catch((err)=>{
+    try {
+      await this.sendStatusMsg({
+        fixedWidthOutput: false,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, msg);
+    } catch (err) {
       console.log(err);
-    });
+    }
   }
   async initThirdPartyClient() {
     this.client = new SlackClient(this.userAccessToken);
@@ -61,8 +63,8 @@ class App extends MatrixPuppetBridgeBase {
     await this.registerMessageListener();
   }
   registerMessageListener() {
-    this.client.on('message', (data)=>{
-      console.log(data);
+    this.client.on('message', async(data)=>{
+      //console.log(data);
       // edit message
       if (data.subtype === "message_changed") {
         if (data.message.text === data.previous_message.text) {
@@ -70,15 +72,16 @@ class App extends MatrixPuppetBridgeBase {
           debug('ignoring duplicate edit', data);
           return;
         }
-        this.createAndSendPayload({
+        await this.createAndSendPayload({
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
           user: data.message.user
         });
         return;
       }
+      // with files
       if (data.files) {
-        const promises = [];
+        let promises = [];
         if (data.text) {
           promises.push(this.createAndSendPayload({
             channel: data.channel,
@@ -89,7 +92,7 @@ class App extends MatrixPuppetBridgeBase {
             user_profile: data.user_profile,
           }));
         }
-        data.files.forEach((file) => {
+        const attachs = data.files.map(async(file) => {
           const d = {
             channel: data.channel,
             text: data.text,
@@ -99,32 +102,37 @@ class App extends MatrixPuppetBridgeBase {
             user_profile: data.user_profile,
             file: file,
           };
-          promises.push(this.sendFile(d).then(() => {
-            if (d.file.initial_comment) {
-              return this.createAndSendPayload({
-                channel: d.channel,
-                text: d.file.initial_comment.comment,
-                attachments: d.attachments,
-                bot_id: d.bot_id,
-                user: d.user,
-                user_profile: d.user_profile,
-              });
-            }
-          }));
-        });
-        Promise.all(promises).catch(err=>{
-          console.error(err);
-          this.sendStatusMsg({
-            fixedWidthOutput: true,
-            roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-          }, err.stack).catch((err)=>{
-            console.error(err);
+          await this.sendFile(d);
+          if (!d.file.initial_comment) {
+            return;
+          }
+          return this.createAndSendPayload({
+            channel: d.channel,
+            text: d.file.initial_comment.comment,
+            attachments: d.attachments,
+            bot_id: d.bot_id,
+            user: d.user,
+            user_profile: d.user_profile,
           });
         });
+        promises = promises.concat(attachs);
+        try {
+          await Promise.all(promises);
+        } catch (err) {
+          console.error(err);
+          try {
+            await this.sendStatusMsg({
+              fixedWidthOutput: true,
+              roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+            }, err.stack);
+          } catch (err) {
+            console.error(err);
+          }
+        }
         return;
       }
       // normal message
-      this.createAndSendPayload({
+      await this.createAndSendPayload({
         channel: data.channel,
         text: data.text,
         attachments: data.attachments,
@@ -133,17 +141,18 @@ class App extends MatrixPuppetBridgeBase {
         user_profile: data.user_profile,
       });
     });
-    this.client.on('typing', (data)=>{
-      console.log(data);
-      this.createAndSendTypingEvent({
+
+    this.client.on('typing', async(data)=>{
+      //console.log(data);
+      await this.createAndSendTypingEvent({
         channel: data.channel,
         user: data.user,
       });
     });
-    this.client.on('rename', (data)=>{
-      console.log(data);
+    this.client.on('rename', async(data)=>{
+      //console.log(data);
       // rename channel
-      this.renameChannelEvent({
+      await this.renameChannelEvent({
         channel: data.channel,
       });
     });
