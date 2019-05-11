@@ -414,16 +414,18 @@ class App extends MatrixPuppetBridgeBase {
       return this._renameChannelEvent(room.room_id, data.name);
     } catch (err) {
       console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
         console.error(err);
-      });
+      }
     }
   }
 
-  getThirdPartyRoomDataById(id) {
+  async getThirdPartyRoomDataById(id) {
     const directName = (user) => this.client.getUserById(user).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
     const room = this.client.getRoomById(id);
@@ -437,11 +439,11 @@ class App extends MatrixPuppetBridgeBase {
     }
   }
 
-  sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
+  async sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
     // not available for now
   }
 
-  sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
+  async sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
     debug('sending message as puppet to third party room with id', id);
     // text lost html informations, just use raw message instead that.
     let message;
@@ -467,11 +469,11 @@ class App extends MatrixPuppetBridgeBase {
     return this.client.sendMessage(message, id);
   }
 
-  sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data, raw) {
+  async sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data, raw) {
     return this.client.sendImageMessage(data.url, data.text, id);
   }
 
-  sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+  async sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
     // deduplicate
     const filename = this.tagMatrixMessage(data.filename);
     return this.client.sendFileMessage(data.url, data.text, filename, id);

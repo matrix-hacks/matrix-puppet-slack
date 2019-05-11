@@ -209,7 +209,7 @@ class Client extends EventEmitter {
    * Attachments are pretty cool, check it here:
    * https://api.slack.com/docs/messages/builder
    */
-  sendImageMessage(imageUrl, title, channel) {
+  async sendImageMessage(imageUrl, title, channel) {
     return this.sendFileMessage(imageUrl, title, title, channel);
   }
   async sendFileMessage(fileUrl, title, filename, channel) {
@@ -223,7 +223,7 @@ class Client extends EventEmitter {
 
     return this.web.files.promise.upload(filename, opts);
   }
-  downloadImage(url) {
+  async downloadImage(url) {
     return download.getBufferAndType(url, {
       headers: { Authorization: 'Bearer ' +  this.token}
     });
