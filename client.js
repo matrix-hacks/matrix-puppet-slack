@@ -1,7 +1,7 @@
 const debug = require('debug')('matrix-puppet:slack:client');
 const EventEmitter = require('events').EventEmitter;
 const promisify = require('util').promisify;
-const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
+const { WebClient, RTMClient, CLIENT_EVENTS } = require('@slack/client');
 const { download, sleep } = require('./utils');
 
 class Client extends EventEmitter {
@@ -18,10 +18,10 @@ class Client extends EventEmitter {
   }
   connect() {
     return new Promise((resolve, reject) => {
-      this.rtm = new RtmClient(this.token);
+      this.rtm = new RTMClient(this.token);
 
       // reject on any unrecoverable error
-      this.rtm.on(CLIENT_EVENTS.RTM.UNABLE_TO_RTM_START, (err) => {
+      this.rtm.once('unable_to_rtm_start', (err) => {
         this.emit('unable-to-start', err);
         reject(err);
       });
@@ -32,11 +32,11 @@ class Client extends EventEmitter {
       // the issue here is that at this point we dont know if
       // its an "unrecoverable error" or not, so if we were to implement
       // reconnect ourself in respones to this event, we may start looping
-      this.rtm.on(CLIENT_EVENTS.RTM.DISCONNECT, () => {
+      this.rtm.on('disconnected', () => {
         this.emit('disconnected'); // can use this to announce status and issue a reconnect
       });
 
-      this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+      this.rtm.on('authenticated', (rtmStartData) => {
         this.web = new WebClient(this.token);
         debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
         if (process.env.DEBUG) {
@@ -51,100 +51,82 @@ class Client extends EventEmitter {
       });
 
       // you need to wait for the client to fully connect before you can send messages
-      this.rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => {
+      this.rtm.on('ready', () => {
         this.emit('connected'); // can use this to announce status
         resolve();
       });
 
-      this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
-        let data = JSON.parse(payload);
-        //console.log(data);
-        switch (data.type) {
-          case 'message':
-            debug('emitting message:', data);
-            this.emit('message', data);
+      this.rtm.on('message', (data) => {
+        //debug('emitting message:', data);
+        this.emit('message', data);
+      });
+
+      for (const ev of ['channel_joined', 'group_joined', 'mpim_joined', 'im_created']) {
+        this.rtm.on(ev, (data) => {
+          const chan = this.getChannelById(data.channel.id);
+          if (!chan) {
+            this.data.channels.push(data.channel);
+          }
+        });
+      }
+
+      for (const ev of ['channel_rename', 'group_rename']) {
+        this.rtm.on(ev, (data) => {
+          let chan = this.getChannelById(data.channel.id);
+          if (!chan) {
+            this.data.channels.push(data.channel);
+            chan = data.channel;
+          }
+          if (chan.name !== data.channel.name) {
+            chan.name = data.channel.name;
+            this.emit('rename', {
+              channel: chan.id,
+              name: chan.name,
+            });
+          }
+        });
+      }
+
+      this.rtm.on('team_join', (data) => {
+        this.data.users.push(data.user);
+        break;
+      });
+
+      this.rtm.on('user_change', (data) => {
+        let found = false;
+        for (let i = 0; i < this.data.users.length; i++) {
+          if (this.data.users[i].id == data.user.id) {
+            this.data.users[i] = data.user;
+            found = true;
             break;
-          case 'channel_joined':
-          case 'group_joined':
-          case 'mpim_joined':
-          case 'im_created':
-            {
-              const chan = this.getChannelById(data.channel.id);
-              if (!chan) {
-                this.data.channels.push(data.channel);
-              }
-            }
-            break;
-          case 'channel_rename':
-          case 'group_rename':
-            {
-              let chan = this.getChannelById(data.channel.id);
-              if (!chan) {
-                this.data.channels.push(data.channel);
-                chan = data.channel;
-              }
-              if (chan.name !== data.channel.name) {
-                chan.name = data.channel.name;
-                this.emit('rename', {
-                  channel: chan.id,
-                  name: chan.name,
-                });
-              }
-            }
-            break;
-          case 'team_join':
-            this.data.users.push(data.user);
-            break;
-          case 'user_change':
-            {
-              let found = false;
-              for (let i = 0; i < this.data.users.length; i++) {
-                if (this.data.users[i].id == data.user.id) {
-                  this.data.users[i] = data.user;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                this.data.users.push(data.user);
-              }
-            }
-            break;
-          case 'user_typing':
-            debug('emitting typing message:', data);
-            this.emit('typing', data);
-            break;
-          case 'bot_added':
-          case 'bot_changed':
-            {
-              let found = false;
-              for (let i = 0; i < this.data.bots.length; i++) {
-                if (this.data.bots[i].id == data.bot.id) {
-                  this.data.bots[i] = data.bot;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                this.data.bots.push(data.bot);
-              }
-            }
-            break;
-          case 'file_shared':
-          case 'file_unshared':
-          case 'file_public':
-          case 'file_change':
-            // TODO
-          case 'reconnect_url':
-          case 'pong':
-            // ignore
-            break;
-          default:
-            debug('raw message, type:', data.type);
-            break;
+          }
+        }
+        if (!found) {
+          this.data.users.push(data.user);
         }
       });
 
+      this.rtm.on('user_typing', (data) => {
+        debug('emitting typing message:', data);
+        this.emit('typing', data);
+        break;
+      });
+
+      for (const ev of ['bot_added', 'bot_changed']) {
+        this.rtm.on('ev', (data) => {
+          let found = false;
+          for (let i = 0; i < this.data.bots.length; i++) {
+            if (this.data.bots[i].id == data.bot.id) {
+              this.data.bots[i] = data.bot;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            this.data.bots.push(data.bot);
+          }
+        });
+      }
       this.rtm.start();
     });
   }
@@ -176,6 +158,8 @@ class Client extends EventEmitter {
   getChannelById(id) {
     const chan = this.getRoomById(id);
     if (!chan || chan.isDirect) {
+      // TODO
+      // web.conversations.info(channelId).then ...
       return null;
     }
     return chan;
@@ -215,14 +199,14 @@ class Client extends EventEmitter {
   async sendFileMessage(fileUrl, title, filename, channel) {
     const { buffer } = await download.getBufferAndType(fileUrl);
     const opts = {
+      filename: filename,
       file: buffer,
       title: title,
       filetype: 'auto',
       channels: channel,
     };
 
-    const upload = promisify(this.web.files.upload.bind(this.web.files));
-    return await upload(filename, opts);
+    return await this.web.files.upload(opts);
   }
   async downloadImage(url) {
     return await download.getBufferAndType(url, {
