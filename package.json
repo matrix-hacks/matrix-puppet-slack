@@ -19,7 +19,6 @@
     "mime-types": "^2.1.14",
     "needle": "^1.4.5",
     "showdown": "^1.6.4",
-    "songbird": "^1.0.7",
     "turndown": "^5.0.1"
   }
 }

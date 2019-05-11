@@ -1,6 +1,6 @@
 const debug = require('debug')('matrix-puppet:slack:client');
-require('songbird');
 const EventEmitter = require('events').EventEmitter;
+const promisify = require('util').promisify;
 const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
 const { download, sleep } = require('./utils');
 
@@ -221,7 +221,8 @@ class Client extends EventEmitter {
       channels: channel,
     };
 
-    return await this.web.files.promise.upload(filename, opts);
+    const upload = promisify(this.web.files.upload.bind(this.web.files));
+    return await upload(filename, opts);
   }
   async downloadImage(url) {
     return await download.getBufferAndType(url, {
