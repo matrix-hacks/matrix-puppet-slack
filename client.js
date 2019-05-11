@@ -210,7 +210,7 @@ class Client extends EventEmitter {
    * https://api.slack.com/docs/messages/builder
    */
   async sendImageMessage(imageUrl, title, channel) {
-    return this.sendFileMessage(imageUrl, title, title, channel);
+    return await this.sendFileMessage(imageUrl, title, title, channel);
   }
   async sendFileMessage(fileUrl, title, filename, channel) {
     const { buffer } = await download.getBufferAndType(fileUrl);
@@ -221,10 +221,10 @@ class Client extends EventEmitter {
       channels: channel,
     };
 
-    return this.web.files.promise.upload(filename, opts);
+    return await this.web.files.promise.upload(filename, opts);
   }
   async downloadImage(url) {
-    return download.getBufferAndType(url, {
+    return await download.getBufferAndType(url, {
       headers: { Authorization: 'Bearer ' +  this.token}
     });
   }

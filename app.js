@@ -28,7 +28,7 @@ class App extends MatrixPuppetBridgeBase {
     return this.servicePrefix;
   }
   async sendStatus(_msg) {
-    let msg = `${this.teamName}: ${_msg}`
+    const msg = `${this.teamName}: ${_msg}`
     try {
       await this.sendStatusMsg({
         fixedWidthOutput: false,
@@ -106,7 +106,7 @@ class App extends MatrixPuppetBridgeBase {
           if (!d.file.initial_comment) {
             return;
           }
-          return this.createAndSendPayload({
+          return await this.createAndSendPayload({
             channel: d.channel,
             text: d.file.initial_comment.comment,
             attachments: d.attachments,
@@ -204,11 +204,11 @@ class App extends MatrixPuppetBridgeBase {
       const { buffer, type } = await this.client.downloadImage(data.file.url_private);
       payload.buffer = buffer;
       payload.mimetype = type;
-      return this.handleThirdPartyRoomImageMessage(payload);
+      return await this.handleThirdPartyRoomImageMessage(payload);
     } catch (err) {
       console.log(err);
       payload.text = '[Image] ('+data.name+') '+data.url;
-      return this.handleThirdPartyRoomMessage(payload);
+      return await this.handleThirdPartyRoomMessage(payload);
     }
   }
   async createAndSendPayload(data) {
@@ -411,7 +411,7 @@ class App extends MatrixPuppetBridgeBase {
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(payload.roomId);
     try {
       const room = await this.puppet.getClient().getRoomIdForAlias(roomAlias);
-      return this._renameChannelEvent(room.room_id, data.name);
+      return await this._renameChannelEvent(room.room_id, data.name);
     } catch (err) {
       console.error(err);
       try {
