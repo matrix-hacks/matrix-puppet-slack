@@ -15,6 +15,8 @@ class Client extends EventEmitter {
       users: [],
       bots: [],
     }
+    this.lockId = 0;
+    this.locks = {};
   }
   connect() {
     return new Promise((resolve, reject) => {
@@ -95,6 +97,41 @@ class Client extends EventEmitter {
   getSelfUserId() {
     return this.data.self.id;
   }
+  acquireFetchLock(group, subKey) {
+    const key = `${group}_${subKey}`;
+    if (this.locks[key]) {
+      return -1;
+    }
+    // release after 1min
+    const lockId = ++this.lockId;
+    if (this.lockId > 1000000) {
+      this.lockId = 0;
+    }
+    this.locks[key] = {
+      id: lockId,
+      timer: setTimeout(() => {
+        if (this.locks[key] && this.locks[key].id === lockId) {
+          delete this.locks[key];
+        }
+      }, 60000),
+    };
+    return lockId;
+  }
+  releaseFetchLock(group, subKey, id) {
+    const key = `${group}_${subKey}`;
+    if (!this.locks[key]) {
+      return;
+    }
+    if (this.locks[key].id !== id) {
+      return;
+    }
+    clearTimeout(this.locks[key].timer);
+    delete this.locks[key];
+  }
+  isAliveFetchLock(group, subkey) {
+    const key = `${group}_${subKey}`;
+    return !!this.locks[key];
+  }
   /**
    * Finds a bot by ID
    *
@@ -116,14 +153,22 @@ class Client extends EventEmitter {
     if (bot) {
       return bot;
     }
+    const lockId = this.acquireFetchLock('bot', id);
+    if (lockId < 0) {
+      while (isAliveFetchLock('bot', id)) {
+        await sleep(100);
+      }
+      return await this.getBotById(id);
+    }
     try {
-      // TODO: prevent multiple request
       const ret = await this.web.bots.info({ bot: id });
       this.updateBot(ret.bot);
+      this.releaseFetchLock('bot', id, lockId);
       return ret.bot;
     } catch (err) {
       console.log(err);
     }
+    this.releaseFetchLock('bot', id, lockId);
     return { name: "unknown" };
   }
   async getUserById(id) {
@@ -131,14 +176,22 @@ class Client extends EventEmitter {
     if (user) {
       return user;
     }
+    const lockId = this.acquireFetchLock('user', id);
+    if (lockId < 0) {
+      while (isAliveFetchLock('user', id)) {
+        await sleep(100);
+      }
+      return await this.getUserById(id);
+    }
     try {
-      // TODO: prevent multiple request
       const ret = await this.web.users.info({ user: id });
       this.updateUser(ret.user);
+      this.releaseFetchLock('user', id, lockId);
       return ret.user;
     } catch (err) {
       console.log(err);
     }
+    this.releaseFetchLock('user', id, lockId);
     return null;
   }
   async getChannelById(id) {
@@ -153,19 +206,26 @@ class Client extends EventEmitter {
   async getRoomById(id) {
     let chan = this.data.channels.find(c => (c.id === id || c.name === id));
     if (!chan) {
-      if (!chan) {
-        try {
-          // TODO: prevent multiple request
-          const ret = await this.web.conversations.info({ channel: id });
-          if (!ret.channel) {
-            return null;
-          }
-          this.updateChannel(ret.channel);
-          chan = ret.channel;
-        } catch (err) {
-          console.log(err);
+      const lockId = this.acquireFetchLock('user', id);
+      if (lockId < 0) {
+        while (isAliveFetchLock('user', id)) {
+          await sleep(100);
+        }
+        return await this.getRoomById(id);
+      }
+      try {
+        const ret = await this.web.conversations.info({ channel: id });
+        if (!ret.channel) {
+          this.releaseFetchLock('user', id, lockId);
           return null;
         }
+        this.updateChannel(ret.channel);
+        this.releaseFetchLock('user', id, lockId);
+        chan = ret.channel;
+      } catch (err) {
+        console.log(err);
+        this.releaseFetchLock('user', id, lockId);
+        return null;
       }
     }
     if (chan.isDirect === undefined) {
