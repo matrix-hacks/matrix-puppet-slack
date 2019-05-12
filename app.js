@@ -188,7 +188,7 @@ class App extends MatrixPuppetBridgeBase {
         }
       }
     } else if (bot_id) {
-      const bot = this.client.getBotById(bot_id);
+      const bot = await this.client.getBotById(bot_id);
       payload.senderName = bot.name;
       payload.senderId = bot_id;
       payload.avatarUrl = bot.icons.image_72

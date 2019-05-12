@@ -87,19 +87,7 @@ class Client extends EventEmitter {
       });
 
       for (const ev of ['bot_added', 'bot_changed']) {
-        this.rtm.on('ev', (data) => {
-          let found = false;
-          for (let i = 0; i < this.data.bots.length; i++) {
-            if (this.data.bots[i].id == data.bot.id) {
-              this.data.bots[i] = data.bot;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            this.data.bots.push(data.bot);
-          }
-        });
+        this.rtm.on('ev', (data) => { this.updateBot(data.bot); });
       }
       this.rtm.start();
     });
@@ -123,8 +111,20 @@ class Client extends EventEmitter {
    *   }
    * }
    **/
-  getBotById(id) {
-    return this.data.bots.find(u => (u.id === id || u.name === id)) || { name: "unknown" };
+  async getBotById(id) {
+    let bot = this.data.bots.find(u => (u.id === id || u.name === id));
+    if (bot) {
+      return bot;
+    }
+    try {
+      // TODO: prevent multiple request
+      const ret = await this.web.bots.info({ bot: id });
+      this.updateBot(ret.bot);
+      return ret.bot;
+    } catch (err) {
+      console.log(err);
+    }
+    return { name: "unknown" };
   }
   async getUserById(id) {
     let user = this.data.users.find(u => (u.id === id || u.name === id));
@@ -134,7 +134,7 @@ class Client extends EventEmitter {
     try {
       // TODO: prevent multiple request
       const ret = await this.web.users.info({ user: id });
-      this.updateUser(user);
+      this.updateUser(ret.user);
       return ret.user;
     } catch (err) {
       console.log(err);
@@ -184,6 +184,19 @@ class Client extends EventEmitter {
     }
     if (!found) {
       this.data.users.push(user);
+    }
+  }
+  updateBot(user) {
+    let found = false;
+    for (let i = 0; i < this.data.bots.length; i++) {
+      if (this.data.bots[i].id == user.id) {
+        this.data.bots[i] = user;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      this.data.bots.push(user);
     }
   }
   updateChannel(channel) {
