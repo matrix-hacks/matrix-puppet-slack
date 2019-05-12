@@ -11,7 +11,6 @@ class Client extends EventEmitter {
     this.rtm = null;
     this.web = null;
     this.data = {
-      self: {},
       channels: [],
       users: [],
       bots: [],
@@ -45,7 +44,7 @@ class Client extends EventEmitter {
           debug(`DEBUG environment variable is on. writing data dump file for your perusal: ${f}`);
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
-        console.log(rtmStartData);
+        this.data.self = rtmStartData.self;
         //this.data = rtmStartData;
         //this.data.channels = this.data.channels
         //  .concat(this.data.groups) // we want the hidden channels, "groups", too!
