@@ -158,7 +158,7 @@ class App extends MatrixPuppetBridgeBase {
     });
     debug('registered message listener');
   }
-  getPayload(data) {
+  async getPayload(data) {
     const {
       channel,
       text,
@@ -172,13 +172,13 @@ class App extends MatrixPuppetBridgeBase {
 
     if (user) {
       if ( user === "USLACKBOT" ) {
-        const u = this.client.getUserById(user);
+        const u = await this.client.getUserById(user);
         payload.senderName = u.name;
         payload.senderId = user;
         payload.avatarUrl = u.profile.image_72;
       } else {
         const isMe = user === this.client.getSelfUserId();
-        let uu = this.client.getUserById(user);
+        let uu = await this.client.getUserById(user);
         payload.senderId = isMe ? undefined : user;
         if (uu) {
           payload.senderName = uu.name;
@@ -196,7 +196,7 @@ class App extends MatrixPuppetBridgeBase {
     return payload;
   }
   async sendFile(data) {
-    let payload = this.getPayload(data);
+    let payload = await this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
     payload.path = ''; // to prevent errors
@@ -293,7 +293,7 @@ class App extends MatrixPuppetBridgeBase {
         .map(m => m.trim())
         .join('\n')
         .trim();
-    let payload = this.getPayload(data);
+    let payload = await this.getPayload(data);
 
     try {
       const replacements = [
@@ -335,7 +335,7 @@ class App extends MatrixPuppetBridgeBase {
         console.log(result);
         const u = result[1];
         const isme = u === this.client.getSelfUserId();
-        const user = this.client.getUserById(u);
+        const user = await this.client.getUserById(u);
         if (user) {
             const id = isme ? config.puppet.id : this.getGhostUserFromThirdPartySenderId(u);
             // todo: update user profile
@@ -376,7 +376,7 @@ class App extends MatrixPuppetBridgeBase {
   }
 
   async createAndSendTypingEvent(data) {
-    const payload = this.getPayload(data);
+    const payload = await this.getPayload(data);
     try {
       const ghostIntent = await getIntentFromThirdPartySenderId(payload.senderId);
       const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
@@ -407,7 +407,7 @@ class App extends MatrixPuppetBridgeBase {
   }
 
   async renameChannelEvent(data) {
-    const payload = this.getPayload(data);
+    const payload = await this.getPayload(data);
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(payload.roomId);
     try {
       const room = await this.puppet.getClient().getRoomIdForAlias(roomAlias);
@@ -426,9 +426,9 @@ class App extends MatrixPuppetBridgeBase {
   }
 
   async getThirdPartyRoomDataById(id) {
-    const directName = (user) => this.client.getUserById(user).name;
+    const directName = async(user) => (await this.client.getUserById(user)).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
-    const room = this.client.getRoomById(id);
+    const room = await this.client.getRoomById(id);
     var purpose = "";
     if ((room.purpose) && room.purpose.value) {
       purpose = room.purpose.value;

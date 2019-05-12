@@ -14,6 +14,7 @@ class Client extends EventEmitter {
       self: {},
       channels: [],
       users: [],
+      bots: [],
     }
   }
   connect() {
@@ -44,10 +45,11 @@ class Client extends EventEmitter {
           debug(`DEBUG environment variable is on. writing data dump file for your perusal: ${f}`);
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
-        this.data = rtmStartData;
-        this.data.channels = this.data.channels
-          .concat(this.data.groups) // we want the hidden channels, "groups", too!
-          .concat(this.data.ims); // also we want the im channels, "ims"
+        console.log(rtmStartData);
+        //this.data = rtmStartData;
+        //this.data.channels = this.data.channels
+        //  .concat(this.data.groups) // we want the hidden channels, "groups", too!
+        //  .concat(this.data.ims); // also we want the im channels, "ims"
       });
 
       // you need to wait for the client to fully connect before you can send messages
@@ -71,45 +73,18 @@ class Client extends EventEmitter {
       }
 
       for (const ev of ['channel_rename', 'group_rename']) {
-        this.rtm.on(ev, (data) => {
-          let chan = this.getChannelById(data.channel.id);
-          if (!chan) {
-            this.data.channels.push(data.channel);
-            chan = data.channel;
-          }
-          if (chan.name !== data.channel.name) {
-            chan.name = data.channel.name;
-            this.emit('rename', {
-              channel: chan.id,
-              name: chan.name,
-            });
-          }
-        });
+        this.rtm.on(ev, (data) => { this.updateChannel(data.channel); });
       }
 
       this.rtm.on('team_join', (data) => {
         this.data.users.push(data.user);
-        break;
       });
 
-      this.rtm.on('user_change', (data) => {
-        let found = false;
-        for (let i = 0; i < this.data.users.length; i++) {
-          if (this.data.users[i].id == data.user.id) {
-            this.data.users[i] = data.user;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          this.data.users.push(data.user);
-        }
-      });
+      this.rtm.on('user_change', (data) => { this.updateUser(data.user); });
 
       this.rtm.on('user_typing', (data) => {
         debug('emitting typing message:', data);
         this.emit('typing', data);
-        break;
       });
 
       for (const ev of ['bot_added', 'bot_changed']) {
@@ -152,29 +127,85 @@ class Client extends EventEmitter {
   getBotById(id) {
     return this.data.bots.find(u => (u.id === id || u.name === id)) || { name: "unknown" };
   }
-  getUserById(id) {
-    return this.data.users.find(u => (u.id === id || u.name === id));
+  async getUserById(id) {
+    let user = this.data.users.find(u => (u.id === id || u.name === id));
+    if (user) {
+      return user;
+    }
+    try {
+      // TODO: prevent multiple request
+      const ret = await this.web.users.info({ user: id });
+      this.updateUser(user);
+      return ret.user;
+    } catch (err) {
+      console.log(err);
+    }
+    return null;
   }
-  getChannelById(id) {
-    const chan = this.getRoomById(id);
+  async getChannelById(id) {
+    const chan = await this.getRoomById(id);
     if (!chan || chan.isDirect) {
-      // TODO
-      // web.conversations.info(channelId).then ...
       return null;
     }
     return chan;
   }
   // get "room" by id will check for channel or IM and hide the details of that difference
   // but pass that detail along in case the callee cares.
-  getRoomById(id) {
-    const chan = this.data.channels.find(c => (c.id === id || c.name === id));
+  async getRoomById(id) {
+    let chan = this.data.channels.find(c => (c.id === id || c.name === id));
     if (!chan) {
-      return null;
+      if (!chan) {
+        try {
+          // TODO: prevent multiple request
+          const ret = await this.web.conversations.info({ channel: id });
+          if (!ret.channel) {
+            return null;
+          }
+          this.updateChannel(ret.channel);
+          chan = ret.channel;
+        } catch (err) {
+          console.log(err);
+          return null;
+        }
+      }
     }
     if (chan.isDirect === undefined) {
       chan.isDirect = !!chan.is_im;
     }
     return chan;
+  }
+  updateUser(user) {
+    let found = false;
+    for (let i = 0; i < this.data.users.length; i++) {
+      if (this.data.users[i].id == user.id) {
+        this.data.users[i] = user;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      this.data.users.push(user);
+    }
+  }
+  updateChannel(channel) {
+    let chan;
+    for (let i = 0; i < this.data.channels.length; i++) {
+      if (this.data.channels[i].id == channel.id) {
+        chan = this.data.channels[i];
+        break;
+      }
+    }
+    if (!chan) {
+      this.data.channels.push(channel);
+      chan = channel;
+    }
+    if (chan.name !== channel.name) {
+      chan.name = channel.name;
+      this.emit('rename', {
+        channel: chan.id,
+        name: chan.name,
+      });
+    }
   }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);
