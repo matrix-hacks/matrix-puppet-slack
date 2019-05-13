@@ -378,7 +378,7 @@ class App extends MatrixPuppetBridgeBase {
   async createAndSendTypingEvent(data) {
     const payload = await this.getPayload(data);
     try {
-      const ghostIntent = await getIntentFromThirdPartySenderId(payload.senderId);
+      const ghostIntent = await this.getIntentFromThirdPartySenderId(payload.senderId);
       const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
       // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
       // client can get timeout value, but intent does not support this yet.
