@@ -155,7 +155,7 @@ class Client extends EventEmitter {
     }
     const lockId = this.acquireFetchLock('bot', id);
     if (lockId < 0) {
-      while (isAliveFetchLock('bot', id)) {
+      while (this.isAliveFetchLock('bot', id)) {
         await sleep(100);
       }
       return await this.getBotById(id);
@@ -178,7 +178,7 @@ class Client extends EventEmitter {
     }
     const lockId = this.acquireFetchLock('user', id);
     if (lockId < 0) {
-      while (isAliveFetchLock('user', id)) {
+      while (this.isAliveFetchLock('user', id)) {
         await sleep(100);
       }
       return await this.getUserById(id);
@@ -208,7 +208,7 @@ class Client extends EventEmitter {
     if (!chan) {
       const lockId = this.acquireFetchLock('user', id);
       if (lockId < 0) {
-        while (isAliveFetchLock('user', id)) {
+        while (this.isAliveFetchLock('user', id)) {
           await sleep(100);
         }
         return await this.getRoomById(id);
