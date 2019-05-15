@@ -39,8 +39,8 @@ class slacktomd {
     return `USER_MENTION_HACK${u}END_USER_MENTION_HACK`;
   }
 
-  _getChannel(c) {
-    const chan = this.app.client.getChannelById(c);
+  async _getChannel(c) {
+    const chan = await this.app.client.getChannelById(c);
     if (chan) {
       const id = this.app.getRoomAliasFromThirdPartyRoomId(c);
       // update room profile
@@ -49,7 +49,7 @@ class slacktomd {
     return c;
   }
 
-  _matchTag(match) {
+  async _matchTag(match) {
     var action = match[1].substr(0,1), p;
 
     switch(action) {
@@ -58,7 +58,7 @@ class slacktomd {
       case "#":
         p = this._payloads(match[1], 1);
         let c = p.length == 1 ? p[0] : p[1];
-        return this._getChannel(c);
+        return await this._getChannel(c);
       case "@":
         p = this._payloads(match[1], 1);
         let u = p.length == 1 ? p[0] : p[1];
@@ -145,7 +145,7 @@ class slacktomd {
     return false;
   }
 
-  _publicParse(text) {
+  async _publicParse(text) {
     if (typeof text !== 'string') {
       return text;
     }
@@ -166,7 +166,7 @@ class slacktomd {
       while ((result = pattern.p.exec(original)) !== null) {
         switch(pattern.cb) {
           case "tag":
-            replace = this._matchTag(result);
+            replace = await this._matchTag(result);
             break;
           case "bold":
             replace = this._matchBold(result);
@@ -196,9 +196,9 @@ class slacktomd {
     return text;
   }
 
-  parse(app, text) {
+  async parse(app, text) {
     this.app = app;
-    return this._publicParse(text);
+    return await this._publicParse(text);
   }
 }
 
