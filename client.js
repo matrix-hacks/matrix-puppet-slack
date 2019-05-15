@@ -1,7 +1,6 @@
 const debug = require('debug')('matrix-puppet:slack:client');
 const EventEmitter = require('events').EventEmitter;
-const promisify = require('util').promisify;
-const { WebClient, RTMClient, CLIENT_EVENTS } = require('@slack/client');
+const { WebClient, RTMClient } = require('@slack/client');
 const { download, sleep } = require('./utils');
 
 class Client extends EventEmitter {
@@ -89,7 +88,7 @@ class Client extends EventEmitter {
       });
 
       for (const ev of ['bot_added', 'bot_changed']) {
-        this.rtm.on('ev', (data) => { this.updateBot(data.bot); });
+        this.rtm.on(ev, (data) => { this.updateBot(data.bot); });
       }
       this.rtm.start();
     });
@@ -166,7 +165,7 @@ class Client extends EventEmitter {
       this.releaseFetchLock('bot', id, lockId);
       return ret.bot;
     } catch (err) {
-      console.log(err);
+      debug('could not fetch the bot info', err.message);
     }
     this.releaseFetchLock('bot', id, lockId);
     return { name: "unknown" };
@@ -189,7 +188,7 @@ class Client extends EventEmitter {
       this.releaseFetchLock('user', id, lockId);
       return ret.user;
     } catch (err) {
-      console.log(err);
+      debug('could not fetch the user info', err.message);
     }
     this.releaseFetchLock('user', id, lockId);
     return null;
@@ -223,7 +222,7 @@ class Client extends EventEmitter {
         this.releaseFetchLock('chan', id, lockId);
         chan = ret.channel;
       } catch (err) {
-        console.log(err);
+        debug('could not fetch the conversation info', err.message);
         this.releaseFetchLock('chan', id, lockId);
         return null;
       }
