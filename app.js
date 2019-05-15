@@ -320,7 +320,7 @@ class App extends MatrixPuppetBridgeBase {
       rawMessage = emojione.shortnameToUnicode(rawMessage);
       console.log("rawMessage");
       console.log(rawMessage);
-      payload.text = slackdown(this, rawMessage);
+      payload.text = await slackdown(this, rawMessage);
       let markdown = payload.text;
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
@@ -507,7 +507,7 @@ class App extends MatrixPuppetBridgeBase {
   async getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId) {
     const matrixRoomId = await super.getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId);
     const name = await this.getRoomState(matrixRoomId, 'name');
-    const chan = this.client.getChannelById(thirdPartyRoomId) || {};
+    const chan = (await this.client.getChannelById(thirdPartyRoomId)) || {};
     if (!chan.name) {
       return matrixRoomId;
     }

@@ -65,8 +65,8 @@ class Client extends EventEmitter {
       });
 
       for (const ev of ['channel_joined', 'group_joined', 'mpim_joined', 'im_created']) {
-        this.rtm.on(ev, (data) => {
-          const chan = this.getChannelById(data.channel.id);
+        this.rtm.on(ev, async(data) => {
+          const chan = await this.getChannelById(data.channel.id);
           if (!chan) {
             this.data.channels.push(data.channel);
           }
