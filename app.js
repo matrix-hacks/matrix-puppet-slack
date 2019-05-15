@@ -434,7 +434,7 @@ class App extends MatrixPuppetBridgeBase {
       purpose = room.purpose.value;
     }
     return {
-      name: room.isDirect ? directName(room.user) : room.name,
+      name: room.isDirect ? (await directName(room.user)) : room.name,
       topic: room.isDirect ? directTopic() : purpose
     }
   }
@@ -514,12 +514,12 @@ class App extends MatrixPuppetBridgeBase {
   async getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId) {
     const matrixRoomId = await super.getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId);
     const name = await this.getRoomState(matrixRoomId, 'name');
-    const chan = (await this.client.getChannelById(thirdPartyRoomId)) || {};
-    if (!chan.name) {
+    const data = await this.getThirdPartyRoomDataById(thirdPartyRoomId);
+    if (!data.name) {
       return matrixRoomId;
     }
-    if (name !== chan.name) {
-      await this._renameChannelEvent(matrixRoomId, chan.name);
+    if (name !== data.name) {
+      await this._renameChannelEvent(matrixRoomId, data.name);
     }
     return matrixRoomId;
   }

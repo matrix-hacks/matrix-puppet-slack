@@ -206,9 +206,9 @@ class Client extends EventEmitter {
   async getRoomById(id) {
     let chan = this.data.channels.find(c => (c.id === id || c.name === id));
     if (!chan) {
-      const lockId = this.acquireFetchLock('user', id);
+      const lockId = this.acquireFetchLock('chan', id);
       if (lockId < 0) {
-        while (this.isAliveFetchLock('user', id)) {
+        while (this.isAliveFetchLock('chan', id)) {
           await sleep(100);
         }
         return await this.getRoomById(id);
@@ -216,15 +216,15 @@ class Client extends EventEmitter {
       try {
         const ret = await this.web.conversations.info({ channel: id });
         if (!ret.channel) {
-          this.releaseFetchLock('user', id, lockId);
+          this.releaseFetchLock('chan', id, lockId);
           return null;
         }
         this.updateChannel(ret.channel);
-        this.releaseFetchLock('user', id, lockId);
+        this.releaseFetchLock('chan', id, lockId);
         chan = ret.channel;
       } catch (err) {
         console.log(err);
-        this.releaseFetchLock('user', id, lockId);
+        this.releaseFetchLock('chan', id, lockId);
         return null;
       }
     }
