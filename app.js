@@ -488,11 +488,18 @@ class App extends MatrixPuppetBridgeBase {
     const puppetClient = this.puppet.getClient();
     switch(type) {
       case 'name':
-        const roomName = await puppetClient.getStateEvent(matrixRoomId, 'm.room.name');
-        if (roomName && roomName.name) {
-          this.updateRoomStatesCache(matrixRoomId, 'name', roomName.name);
+        try {
+          const roomName = await puppetClient.getStateEvent(matrixRoomId, 'm.room.name');
+          if (roomName && roomName.name) {
+            this.updateRoomStatesCache(matrixRoomId, 'name', roomName.name);
+          }
+          return roomName.name;
+        } catch (e) {
+          if (e.errcode === 'M_NOT_FOUND') {
+            return;
+          }
+          throw e;
         }
-        return roomName.name;
       // TODO
     }
   }
