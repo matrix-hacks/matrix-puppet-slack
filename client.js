@@ -128,7 +128,7 @@ class Client extends EventEmitter {
     clearTimeout(this.locks[key].timer);
     delete this.locks[key];
   }
-  isAliveFetchLock(group, subkey) {
+  isAliveFetchLock(group, subKey) {
     const key = `${group}_${subKey}`;
     return !!this.locks[key];
   }
