@@ -5,16 +5,16 @@ class mdtoslack {
   constructor() {
   }
 
-  _getUser(u) {
+  async _getUser(u) {
     const isMe = u === config.puppet.id;
     const userid = isMe ? this.app.client.getSelfUserId() : this.app.getThirdPartyUserIdFromMatrixGhostId(u);
-    if (!this.app.client.getUserById(userid)) {
+    if (!await this.app.client.getUserById(userid)) {
       return u;
     }
     return `<@${userid}>`;
   }
 
-  _getChannel(c) {
+  async _getChannel(c) {
     let chanid;
     try {
       chanid = this.app.getThirdPartyRoomIdFromMatrixRoomId(c);
@@ -30,14 +30,14 @@ class mdtoslack {
       }
       chanid = matches[1];
     }
-    const chan = this.app.client.getChannelById(chanid);
+    const chan = await this.app.client.getChannelById(chanid);
     if (!chan) {
       return c;
     }
     return `<#${chan.id}|${chan.name}>`;
   }
 
-  _matchMention(match) {
+  async _matchMention(match) {
     const name = match[1];
     const mxid = match[2];
 
@@ -50,15 +50,15 @@ class mdtoslack {
         //return this._payloads(match[1]);
         return match[1];
       case "#":
-        return this._getChannel(match[2]);
+        return await this._getChannel(match[2]);
       case "@":
-        return this._getUser(match[2]);
+        return await this._getUser(match[2]);
       default:
         return match[1];
     }
   }
 
-  _publicParse(text) {
+  async _publicParse(text) {
     if (typeof text !== 'string') {
       return text;
     }
@@ -73,7 +73,7 @@ class mdtoslack {
       while ((result = pattern.p.exec(original)) !== null) {
         switch(pattern.cb) {
           case "mention":
-            replace = this._matchMention(result);
+            replace = await this._matchMention(result);
             break;
           default:
             return text;
@@ -88,9 +88,9 @@ class mdtoslack {
     return text;
   }
 
-  parse(app, text) {
+  async parse(app, text) {
     this.app = app;
-    return this._publicParse(text);
+    return await this._publicParse(text);
   }
 }
 
@@ -112,8 +112,8 @@ if (!module.parent) {
   }
   const app = {
     client: {
-      getChannelById: (id) => CHANS[id],
-      getUserById: (id) => USERS[id],
+      getChannelById: async(id) => CHANS[id],
+      getUserById: async(id) => USERS[id],
       getSelfUserId: (id) => {},
     },
     domain: 'matrix',
@@ -121,9 +121,9 @@ if (!module.parent) {
     getThirdPartyUserIdFromMatrixGhostId: (id) => MX_TP[id],
   }
   const parser = new mdtoslack();
-  console.log(parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)'));
-  console.log(parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix): [slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)'));
-  console.log(parser.parse(app, '[#test](https://matrix.to/#/#slack_FOO_test:matrix)'));
+  parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)').then(console.log);
+  parser.parse(app, '[slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix): [slackbot](https://matrix.to/#/@slack_FOO_USLACKBOT:matrix)').then(console.log);
+  parser.parse(app, '[#test](https://matrix.to/#/#slack_FOO_test:matrix)').then(console.log);
 } else {
   module.exports = mdtoslack;
 }
