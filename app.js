@@ -417,7 +417,7 @@ class App extends MatrixPuppetBridgeBase {
     const directName = async(user) => (await this.client.getUserById(user)).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
     const room = await this.client.getRoomById(id);
-    var purpose = "";
+    let purpose = "";
     if ((room.purpose) && room.purpose.value) {
       purpose = room.purpose.value;
     }
@@ -441,7 +441,7 @@ class App extends MatrixPuppetBridgeBase {
       //console.log("rawMessage");
       //console.log(rawMessage);
 
-      message = mxtoslack(this, rawMessage);
+      message = await mxtoslack(this, rawMessage);
     } else {
       message = data.content.body;
     }

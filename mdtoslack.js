@@ -38,13 +38,10 @@ class mdtoslack {
   }
 
   async _matchMention(match) {
-    const name = match[1];
-    const mxid = match[2];
+    // const name = match[1];
+    // const mxid = match[2];
 
-    var action = match[2].substr(0,1), p;
-
-    //console.log(action);
-    //console.log(name, mxid, match[0], match[1], action, p);
+    const action = match[2].substr(0,1);
     switch(action) {
       case "!":
         //return this._payloads(match[1]);
@@ -77,7 +74,6 @@ class mdtoslack {
             break;
           default:
             return text;
-            break;
         }
 
         if (replace) {

@@ -7,16 +7,16 @@ const slackdown = async function(app, msg) {
 }
 
 if (!module.parent) {
-  var app = {
+  const app = {
     client: {
       getUserById: () => {},
       getChannelById: () => {},
     }
   };
   slackdown(app, 'Card moved: "<https://trello.com/c/z1m8Yndl|ignore this card! testing slack&lt;-&gt;matrix bridge with respect to trello>" from list "Doing" to list "ToDo"').then((md) => {
-    var showdown  = require('showdown');
-    var converter = new showdown.Converter();
-    var html      = converter.makeHtml(md);
+    const showdown  = require('showdown');
+    const converter = new showdown.Converter();
+    const html      = converter.makeHtml(md);
     console.log(html);
   });
 } else {

@@ -19,8 +19,8 @@ turndown.addRule('removeTrailingFencedCodeBlock', {
   },
 
   replacement: function (content, node, options) {
-    var className = node.firstChild.className || ''
-    var language = (className.match(/language-(\S+)/) || [null, ''])[1]
+    const className = node.firstChild.className || ''
+    const language = (className.match(/language-(\S+)/) || [null, ''])[1]
 
     return (
       '\n\n' + options.fence + language + '\n' +

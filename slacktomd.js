@@ -1,5 +1,4 @@
 "use strict";
-const config = require('./config.json');
 
 class slacktomd {
   constructor() {
@@ -50,19 +49,24 @@ class slacktomd {
   }
 
   async _matchTag(match) {
-    var action = match[1].substr(0,1), p;
+    const action = match[1].substr(0,1);
+    let p;
 
     switch(action) {
       case "!":
         return this._payloads(match[1]);
       case "#":
         p = this._payloads(match[1], 1);
-        let c = p.length == 1 ? p[0] : p[1];
-        return await this._getChannel(c);
+        {
+          const c = p.length == 1 ? p[0] : p[1];
+          return await this._getChannel(c);
+        }
       case "@":
         p = this._payloads(match[1], 1);
-        let u = p.length == 1 ? p[0] : p[1];
-        return this._getUser(u);
+        {
+          const u = p.length == 1 ? p[0] : p[1];
+          return this._getUser(u);
+        }
       default:
         p = this._payloads(match[1]);
         return this._markdownTag("href", p[0], (p.length == 1 ? p[0] : p[1]));
@@ -79,25 +83,18 @@ class slacktomd {
     switch(tag) {
       case "italic":
         return "_" + payload + "_";
-        break;
       case "bold":
         return "**" + payload + "**";
-        break;
       case "fixed":
         return "`" + payload + "`";
-        break;
       case "blockFixed":
         return "```\n" + payload.trim() + "\n```";
-        break;
       case "strike":
         return "~~" + payload + "~~";
-        break;
       case "href":
         return "[" + linkText + "](" + payload + ")";
-        break;
       default:
         return payload;
-        break;
     }
   }
 
@@ -126,16 +123,16 @@ class slacktomd {
   }
 
   _safeMatch(match, tag) {
-    var prefix_ok = match.index == 0;
-    var postfix_ok = match.index == match.input.length - match[0].length;
+    let prefix_ok = match.index == 0;
+    let postfix_ok = match.index == match.input.length - match[0].length;
 
     if(!prefix_ok) {
-      let charAtLeft = match.input.substr(match.index - 1, 1);
+      const charAtLeft = match.input.substr(match.index - 1, 1);
       prefix_ok = this._isWhiteSpace(charAtLeft);
     }
 
     if(!postfix_ok) {
-      let charAtRight = match.input.substr(match.index + match[0].length, 1);
+      const charAtRight = match.input.substr(match.index + match[0].length, 1);
       postfix_ok = this._isWhiteSpace(charAtRight);
     }
 
@@ -149,7 +146,7 @@ class slacktomd {
     if (typeof text !== 'string') {
       return text;
     }
-    var patterns = [
+    const patterns = [
       {p: /<(.*?)>/g, cb: "tag"},
       {p: /\*([^\*]*?)\*/g, cb: "bold"},
       {p: /_([^_]*?)_/g, cb: "italic"},
@@ -185,7 +182,6 @@ class slacktomd {
             break;
           default:
             return text;
-            break;
         }
 
         if (replace) {
