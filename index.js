@@ -1,4 +1,3 @@
-const path = require('path');
 const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
@@ -8,9 +7,6 @@ const {
 } = require("matrix-puppet-bridge");
 const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
-const slackdown = require('./slackdown');
-const showdown  = require('showdown');
-const converter = new showdown.Converter();
 const App = require('./app');
 
 new Cli({
@@ -27,7 +23,7 @@ new Cli({
       reg.addRegexPattern("aliases", `#slack_.*`, false);
       callback(reg);
     } catch (err) {
-      console.error(err.message);
+      debug(err.message);
       process.exit(-1);
     }
   },
@@ -59,7 +55,7 @@ new Cli({
     const bridge = new Bridge(Object.assign({}, config.bridge, {
       controller: {
         onUserQuery: function(queriedUser) {
-          console.log('got user query', queriedUser);
+          debug('got user query', queriedUser);
           return {}; // auto provision users w no additional data
         },
         onEvent: async function(req, ctx) {
@@ -72,23 +68,23 @@ new Cli({
               return app.handleMatrixEvent(req, ctx);
             } catch (err) {
               debug('could not get app for matrix room id');
-              console.error(err);
+              debug(err);
             }
           }
         },
         onAliasQuery: function() {
-          console.log('on alias query');
+          debug('on alias query');
         },
         thirdPartyLookup: {
           protocols: config.slack.map(i=>`slack_${i.team_name}`),
           getProtocol: function() {
-            console.log('get proto');
+            debug('get proto');
           },
           getLocation: function() {
-            console.log('get loc');
+            debug('get loc');
           },
           getUser: function() {
-            console.log('get user');
+            debug('get user');
           }
         }
       }
@@ -114,9 +110,9 @@ new Cli({
         debug('!!!! apps....', a.teamName);
       });
       teamAppList = apps;
-      console.log('Matrix-side listening on port %s', port);
+      debug('Matrix-side listening on port %s', port);
     } catch (err) {
-      console.error(err.stack);
+      debug(err.stack);
       process.exit(-1);
     }
   }
