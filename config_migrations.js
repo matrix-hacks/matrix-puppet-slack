@@ -14,7 +14,7 @@ var run = function() {
     if (migrations_ran) {
         fs.writeFile('./config.json', JSON.stringify(config, null, 4), 'utf8', function (err) {
             if (err) {
-                console.log('Unable to write new config after migrations.');
+                console.log('Unable to write new config after migrations.  Please make the above edits manually.');
                 throw err;
             }
             console.log('Successfully migrated config.  Please restart the bridge.');
