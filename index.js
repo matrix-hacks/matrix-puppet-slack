@@ -1,3 +1,6 @@
+const migrations = require('./config_migrations');
+migrations.run();
+
 const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
