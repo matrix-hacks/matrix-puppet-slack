@@ -1,8 +1,7 @@
 const debug = require('debug')('matrix-puppet:slack:client');
-const Promise = require('bluebird');
 const EventEmitter = require('events').EventEmitter;
-const { WebClient, RtmClient, CLIENT_EVENTS } = require('@slack/client');
-const { download } = require('./utils');
+const { WebClient, RTMClient } = require('@slack/client');
+const { download, sleep } = require('./utils');
 
 class Client extends EventEmitter {
   constructor(token) {
@@ -11,17 +10,19 @@ class Client extends EventEmitter {
     this.rtm = null;
     this.web = null;
     this.data = {
-      self: {},
       channels: [],
       users: [],
+      bots: [],
     }
+    this.lockId = 0;
+    this.locks = {};
   }
   connect() {
     return new Promise((resolve, reject) => {
-      this.rtm = new RtmClient(this.token);
+      this.rtm = new RTMClient(this.token);
 
       // reject on any unrecoverable error
-      this.rtm.on(CLIENT_EVENTS.RTM.UNABLE_TO_RTM_START, (err) => {
+      this.rtm.once('unable_to_rtm_start', (err) => {
         this.emit('unable-to-start', err);
         reject(err);
       });
@@ -32,11 +33,11 @@ class Client extends EventEmitter {
       // the issue here is that at this point we dont know if
       // its an "unrecoverable error" or not, so if we were to implement
       // reconnect ourself in respones to this event, we may start looping
-      this.rtm.on(CLIENT_EVENTS.RTM.DISCONNECT, () => {
+      this.rtm.on('disconnected', () => {
         this.emit('disconnected'); // can use this to announce status and issue a reconnect
       });
 
-      this.rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
+      this.rtm.on('authenticated', (rtmStartData) => {
         this.web = new WebClient(this.token);
         debug(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}`);
         if (process.env.DEBUG) {
@@ -44,103 +45,91 @@ class Client extends EventEmitter {
           debug(`DEBUG environment variable is on. writing data dump file for your perusal: ${f}`);
           require('fs').writeFileSync(f, JSON.stringify(rtmStartData, null, 2));
         }
-        this.data = rtmStartData;
-        this.data.channels = this.data.channels
-          .concat(this.data.groups) // we want the hidden channels, "groups", too!
-          .concat(this.data.ims); // also we want the im channels, "ims"
+        this.data.self = rtmStartData.self;
+        //this.data = rtmStartData;
+        //this.data.channels = this.data.channels
+        //  .concat(this.data.groups) // we want the hidden channels, "groups", too!
+        //  .concat(this.data.ims); // also we want the im channels, "ims"
       });
 
       // you need to wait for the client to fully connect before you can send messages
-      this.rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, () => {
+      this.rtm.on('ready', () => {
         this.emit('connected'); // can use this to announce status
         resolve();
       });
 
-      this.rtm.on(CLIENT_EVENTS.RTM.RAW_MESSAGE, (payload) => {
-        let data = JSON.parse(payload);
-        //console.log(data);
-        switch (data.type) {
-          case 'message':
-            debug('emitting message:', data);
-            this.emit('message', data);
-            break;
-          case 'channel_joined':
-          case 'group_joined':
-          case 'mpim_joined':
-          case 'im_created':
-            {
-              const chan = this.getChannelById(data.channel.id);
-              if (!chan) {
-                this.data.channels.push(data.channel);
-              }
-            }
-            break;
-          case 'channel_rename':
-          case 'group_rename':
-            {
-              let chan = this.getChannelById(data.channel.id);
-              if (!chan) {
-                this.data.channels.push(data.channel);
-                chan = data.channel;
-              }
-              if (chan.name !== data.channel.name) {
-                chan.name = data.channel.name;
-              }
-            }
-            break;
-          case 'team_join':
-            this.data.users.push(data.user);
-            break;
-          case 'user_change':
-            {
-              let found = false;
-              for (let i = 0; i < this.data.users.length; i++) {
-                if (this.data.users[i].id == data.user.id) {
-                  this.data.users[i] = data.user;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                this.data.users.push(data.user);
-              }
-            }
-            break;
-          case 'user_typing':
-            debug('emitting typing message:', data);
-            this.emit('typing', data);
-            break;
-          case 'bot_added':
-          case 'bot_changed':
-            {
-              let found = false;
-              for (let i = 0; i < this.data.bots.length; i++) {
-                if (this.data.bots[i].id == data.bot.id) {
-                  this.data.bots[i] = data.bot;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                this.data.bots.push(data.bot);
-              }
-            }
-            break;
-          case 'reconnect_url':
-          case 'pong':
-            // ignore
-            break;
-          default:
-            debug('raw message, type:', data.type);
-            break;
-        }
+      this.rtm.on('message', (data) => {
+        //debug('emitting message:', data);
+        this.emit('message', data);
       });
 
+      for (const ev of ['channel_joined', 'group_joined', 'mpim_joined', 'im_created']) {
+        this.rtm.on(ev, async(data) => {
+          const chan = await this.getChannelById(data.channel.id);
+          if (!chan) {
+            this.data.channels.push(data.channel);
+          }
+        });
+      }
+
+      for (const ev of ['channel_rename', 'group_rename']) {
+        this.rtm.on(ev, (data) => { this.updateChannel(data.channel); });
+      }
+
+      this.rtm.on('team_join', (data) => {
+        this.data.users.push(data.user);
+      });
+
+      this.rtm.on('user_change', (data) => { this.updateUser(data.user); });
+
+      this.rtm.on('user_typing', (data) => {
+        debug('emitting typing message:', data);
+        this.emit('typing', data);
+      });
+
+      for (const ev of ['bot_added', 'bot_changed']) {
+        this.rtm.on(ev, (data) => { this.updateBot(data.bot); });
+      }
       this.rtm.start();
     });
   }
   getSelfUserId() {
     return this.data.self.id;
+  }
+  acquireFetchLock(group, subKey) {
+    const key = `${group}_${subKey}`;
+    if (this.locks[key]) {
+      return -1;
+    }
+    // release after 1min
+    const lockId = ++this.lockId;
+    if (this.lockId > 1000000) {
+      this.lockId = 0;
+    }
+    this.locks[key] = {
+      id: lockId,
+      timer: setTimeout(() => {
+        if (this.locks[key] && this.locks[key].id === lockId) {
+          delete this.locks[key];
+        }
+      }, 60000),
+    };
+    return lockId;
+  }
+  releaseFetchLock(group, subKey, id) {
+    const key = `${group}_${subKey}`;
+    if (!this.locks[key]) {
+      return;
+    }
+    if (this.locks[key].id !== id) {
+      return;
+    }
+    clearTimeout(this.locks[key].timer);
+    delete this.locks[key];
+  }
+  isAliveFetchLock(group, subKey) {
+    const key = `${group}_${subKey}`;
+    return !!this.locks[key];
   }
   /**
    * Finds a bot by ID
@@ -158,14 +147,54 @@ class Client extends EventEmitter {
    *   }
    * }
    **/
-  getBotById(id) {
-    return this.data.bots.find(u => (u.id === id || u.name === id)) || { name: "unknown" };
+  async getBotById(id) {
+    let bot = this.data.bots.find(u => (u.id === id || u.name === id));
+    if (bot) {
+      return bot;
+    }
+    const lockId = this.acquireFetchLock('bot', id);
+    if (lockId < 0) {
+      while (this.isAliveFetchLock('bot', id)) {
+        await sleep(100);
+      }
+      return await this.getBotById(id);
+    }
+    try {
+      const ret = await this.web.bots.info({ bot: id });
+      this.updateBot(ret.bot);
+      this.releaseFetchLock('bot', id, lockId);
+      return ret.bot;
+    } catch (err) {
+      debug('could not fetch the bot info', err.message);
+    }
+    this.releaseFetchLock('bot', id, lockId);
+    return { name: "unknown" };
   }
-  getUserById(id) {
-    return this.data.users.find(u => (u.id === id || u.name === id));
+  async getUserById(id) {
+    let user = this.data.users.find(u => (u.id === id || u.name === id));
+    if (user) {
+      return user;
+    }
+    const lockId = this.acquireFetchLock('user', id);
+    if (lockId < 0) {
+      while (this.isAliveFetchLock('user', id)) {
+        await sleep(100);
+      }
+      return await this.getUserById(id);
+    }
+    try {
+      const ret = await this.web.users.info({ user: id });
+      this.updateUser(ret.user);
+      this.releaseFetchLock('user', id, lockId);
+      return ret.user;
+    } catch (err) {
+      debug('could not fetch the user info', err.message);
+    }
+    this.releaseFetchLock('user', id, lockId);
+    return null;
   }
-  getChannelById(id) {
-    const chan = this.getRoomById(id);
+  async getChannelById(id) {
+    const chan = await this.getRoomById(id);
     if (!chan || chan.isDirect) {
       return null;
     }
@@ -173,15 +202,81 @@ class Client extends EventEmitter {
   }
   // get "room" by id will check for channel or IM and hide the details of that difference
   // but pass that detail along in case the callee cares.
-  getRoomById(id) {
-    const chan = this.data.channels.find(c => (c.id === id || c.name === id));
+  async getRoomById(id) {
+    let chan = this.data.channels.find(c => (c.id === id || c.name === id));
     if (!chan) {
-      return null;
+      const lockId = this.acquireFetchLock('chan', id);
+      if (lockId < 0) {
+        while (this.isAliveFetchLock('chan', id)) {
+          await sleep(100);
+        }
+        return await this.getRoomById(id);
+      }
+      try {
+        const ret = await this.web.conversations.info({ channel: id });
+        if (!ret.channel) {
+          this.releaseFetchLock('chan', id, lockId);
+          return null;
+        }
+        this.updateChannel(ret.channel);
+        this.releaseFetchLock('chan', id, lockId);
+        chan = ret.channel;
+      } catch (err) {
+        debug('could not fetch the conversation info', err.message);
+        this.releaseFetchLock('chan', id, lockId);
+        return null;
+      }
     }
     if (chan.isDirect === undefined) {
       chan.isDirect = !!chan.is_im;
     }
     return chan;
+  }
+  updateUser(user) {
+    let found = false;
+    for (let i = 0; i < this.data.users.length; i++) {
+      if (this.data.users[i].id == user.id) {
+        this.data.users[i] = user;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      this.data.users.push(user);
+    }
+  }
+  updateBot(user) {
+    let found = false;
+    for (let i = 0; i < this.data.bots.length; i++) {
+      if (this.data.bots[i].id == user.id) {
+        this.data.bots[i] = user;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      this.data.bots.push(user);
+    }
+  }
+  updateChannel(channel) {
+    let chan;
+    for (let i = 0; i < this.data.channels.length; i++) {
+      if (this.data.channels[i].id == channel.id) {
+        chan = this.data.channels[i];
+        break;
+      }
+    }
+    if (!chan) {
+      this.data.channels.push(channel);
+      chan = channel;
+    }
+    if (chan.name !== channel.name) {
+      chan.name = channel.name;
+      this.emit('rename', {
+        channel: chan.id,
+        name: chan.name,
+      });
+    }
   }
   sendMessage(text, channel) {
     return this.rtm.sendMessage(text, channel);
@@ -200,27 +295,23 @@ class Client extends EventEmitter {
    * Attachments are pretty cool, check it here:
    * https://api.slack.com/docs/messages/builder
    */
-  sendImageMessage(imageUrl, title, channel) {
-    return this.sendFileMessage(imageUrl, title, title, channel);
+  async sendImageMessage(imageUrl, title, channel) {
+    return await this.sendFileMessage(imageUrl, title, title, channel);
   }
-  sendFileMessage(fileUrl, title, filename, channel) {
-    return new Promise((resolve, reject) => {
-      download.getBufferAndType(fileUrl).then(({ buffer }) => {
-        const opts = {
-          file: buffer,
-          title: title,
-          filetype: 'auto',
-          channels: channel,
-        };
+  async sendFileMessage(fileUrl, title, filename, channel) {
+    const { buffer } = await download.getBufferAndType(fileUrl);
+    const opts = {
+      filename: filename,
+      file: buffer,
+      title: title,
+      filetype: 'auto',
+      channels: channel,
+    };
 
-        return this.web.files.upload(filename, opts, (err, res) => {
-          err ? reject(err) : resolve(res);
-        });
-      });
-    });
+    return await this.web.files.upload(opts);
   }
-  downloadImage(url) {
-    return download.getBufferAndType(url, {
+  async downloadImage(url) {
+    return await download.getBufferAndType(url, {
       headers: { Authorization: 'Bearer ' +  this.token}
     });
   }

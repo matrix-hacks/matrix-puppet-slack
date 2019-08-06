@@ -19,8 +19,8 @@ turndown.addRule('removeTrailingFencedCodeBlock', {
   },
 
   replacement: function (content, node, options) {
-    var className = node.firstChild.className || ''
-    var language = (className.match(/language-(\S+)/) || [null, ''])[1]
+    const className = node.firstChild.className || ''
+    const language = (className.match(/language-(\S+)/) || [null, ''])[1]
 
     return (
       '\n\n' + options.fence + language + '\n' +
@@ -30,8 +30,8 @@ turndown.addRule('removeTrailingFencedCodeBlock', {
   }
 });
 
-const mxtoslack = function(app, msg) {
-  return parser.parse(app, turndown.turndown(msg));
+const mxtoslack = async function(app, msg) {
+  return await parser.parse(app, turndown.turndown(msg));
 }
 
 if (!module.parent) {
@@ -46,16 +46,16 @@ if (!module.parent) {
   };
   const app = {
     client: {
-      getChannelById: () => {},
-      getUserById: (id) => USERS[id],
+      getChannelById: async() => {},
+      getUserById: async(id) => USERS[id],
       getSelfUserId: (id) => {},
     },
     getThirdPartyUserIdFromMatrixGhostId: (id) => MX_TP[id],
   }
-  console.log(mxtoslack(app, '@room'));
-  console.log(mxtoslack(app, '<a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>:'));
-  console.log(mxtoslack(app, '<a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>: <a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>'));
-  console.log(mxtoslack(app, '<pre><code>test\n</code></pre>\n'));
+  mxtoslack(app, '@room').then(console.log);
+  mxtoslack(app, '<a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>:').then(console.log);
+  mxtoslack(app, '<a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>: <a href="https://matrix.to/#/@slack_FOO_USLACKBOT:matrix">slackbot</a>').then(console.log);
+  mxtoslack(app, '<pre><code>test\n</code></pre>\n').then(console.log);
 } else {
   module.exports = mxtoslack;
 }

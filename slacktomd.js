@@ -1,5 +1,4 @@
 "use strict";
-const config = require('./config.json');
 
 class slacktomd {
   constructor() {
@@ -39,8 +38,8 @@ class slacktomd {
     return `USER_MENTION_HACK${u}END_USER_MENTION_HACK`;
   }
 
-  _getChannel(c) {
-    const chan = this.app.client.getChannelById(c);
+  async _getChannel(c) {
+    const chan = await this.app.client.getChannelById(c);
     if (chan) {
       const id = this.app.getRoomAliasFromThirdPartyRoomId(c);
       // update room profile
@@ -49,20 +48,25 @@ class slacktomd {
     return c;
   }
 
-  _matchTag(match) {
-    var action = match[1].substr(0,1), p;
+  async _matchTag(match) {
+    const action = match[1].substr(0,1);
+    let p;
 
     switch(action) {
       case "!":
         return this._payloads(match[1]);
       case "#":
         p = this._payloads(match[1], 1);
-        let c = p.length == 1 ? p[0] : p[1];
-        return this._getChannel(c);
+        {
+          const c = p.length == 1 ? p[0] : p[1];
+          return await this._getChannel(c);
+        }
       case "@":
         p = this._payloads(match[1], 1);
-        let u = p.length == 1 ? p[0] : p[1];
-        return this._getUser(u);
+        {
+          const u = p.length == 1 ? p[0] : p[1];
+          return this._getUser(u);
+        }
       default:
         p = this._payloads(match[1]);
         return this._markdownTag("href", p[0], (p.length == 1 ? p[0] : p[1]));
@@ -79,25 +83,18 @@ class slacktomd {
     switch(tag) {
       case "italic":
         return "_" + payload + "_";
-        break;
       case "bold":
         return "**" + payload + "**";
-        break;
       case "fixed":
         return "`" + payload + "`";
-        break;
       case "blockFixed":
         return "```\n" + payload.trim() + "\n```";
-        break;
       case "strike":
         return "~~" + payload + "~~";
-        break;
       case "href":
         return "[" + linkText + "](" + payload + ")";
-        break;
       default:
         return payload;
-        break;
     }
   }
 
@@ -126,16 +123,16 @@ class slacktomd {
   }
 
   _safeMatch(match, tag) {
-    var prefix_ok = match.index == 0;
-    var postfix_ok = match.index == match.input.length - match[0].length;
+    let prefix_ok = match.index == 0;
+    let postfix_ok = match.index == match.input.length - match[0].length;
 
     if(!prefix_ok) {
-      let charAtLeft = match.input.substr(match.index - 1, 1);
+      const charAtLeft = match.input.substr(match.index - 1, 1);
       prefix_ok = this._isWhiteSpace(charAtLeft);
     }
 
     if(!postfix_ok) {
-      let charAtRight = match.input.substr(match.index + match[0].length, 1);
+      const charAtRight = match.input.substr(match.index + match[0].length, 1);
       postfix_ok = this._isWhiteSpace(charAtRight);
     }
 
@@ -145,11 +142,11 @@ class slacktomd {
     return false;
   }
 
-  _publicParse(text) {
+  async _publicParse(text) {
     if (typeof text !== 'string') {
       return text;
     }
-    var patterns = [
+    const patterns = [
       {p: /<(.*?)>/g, cb: "tag"},
       {p: /\*([^\*]*?)\*/g, cb: "bold"},
       {p: /_([^_]*?)_/g, cb: "italic"},
@@ -166,7 +163,7 @@ class slacktomd {
       while ((result = pattern.p.exec(original)) !== null) {
         switch(pattern.cb) {
           case "tag":
-            replace = this._matchTag(result);
+            replace = await this._matchTag(result);
             break;
           case "bold":
             replace = this._matchBold(result);
@@ -185,7 +182,6 @@ class slacktomd {
             break;
           default:
             return text;
-            break;
         }
 
         if (replace) {
@@ -196,9 +192,9 @@ class slacktomd {
     return text;
   }
 
-  parse(app, text) {
+  async parse(app, text) {
     this.app = app;
-    return this._publicParse(text);
+    return await this._publicParse(text);
   }
 }
 
