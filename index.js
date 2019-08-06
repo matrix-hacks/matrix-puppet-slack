@@ -12,10 +12,6 @@ const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
 const App = require('./app');
 
-function getPrefix() {
-  return config.prefix === undefined ? 'slack' : config.prefix;
-}
-
 new Cli({
   port: config.port,
   registrationPath: config.registrationPath,
@@ -25,9 +21,9 @@ new Cli({
       reg.setId(AppServiceRegistration.generateToken());
       reg.setHomeserverToken(AppServiceRegistration.generateToken());
       reg.setAppServiceToken(AppServiceRegistration.generateToken());
-      reg.setSenderLocalpart(`${getPrefix()}_bot`);
-      reg.addRegexPattern("users", `@${getPrefix()}_.*`, true);
-      reg.addRegexPattern("aliases", `#${getPrefix()}_.*`, false);
+      reg.setSenderLocalpart(`${config.prefix}_bot`);
+      reg.addRegexPattern("users", `@${config.prefix}_.*`, true);
+      reg.addRegexPattern("aliases", `#${config.prefix}_.*`, false);
       callback(reg);
     } catch (err) {
       debug(err.message);
@@ -83,7 +79,7 @@ new Cli({
           debug('on alias query');
         },
         thirdPartyLookup: {
-          protocols: config.slack.map(i=>`${getPrefix()}_${i.team_name}`),
+          protocols: config.slack.map(i=>`${config.prefix}_${i.team_name}`),
           getProtocol: function() {
             debug('get proto');
           },
