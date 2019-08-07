@@ -1,3 +1,6 @@
+const migrations = require('./config_migrations');
+migrations.run();
+
 const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
@@ -18,9 +21,9 @@ new Cli({
       reg.setId(AppServiceRegistration.generateToken());
       reg.setHomeserverToken(AppServiceRegistration.generateToken());
       reg.setAppServiceToken(AppServiceRegistration.generateToken());
-      reg.setSenderLocalpart(`slack_bot`);
-      reg.addRegexPattern("users", `@slack_.*`, true);
-      reg.addRegexPattern("aliases", `#slack_.*`, false);
+      reg.setSenderLocalpart(`${config.prefix}_bot`);
+      reg.addRegexPattern("users", `@${config.prefix}_.*`, true);
+      reg.addRegexPattern("aliases", `#${config.prefix}_.*`, false);
       callback(reg);
     } catch (err) {
       debug(err.message);
@@ -76,7 +79,7 @@ new Cli({
           debug('on alias query');
         },
         thirdPartyLookup: {
-          protocols: config.slack.map(i=>`slack_${i.team_name}`),
+          protocols: config.slack.map(i=>`${config.prefix}_${i.team_name}`),
           getProtocol: function() {
             debug('get proto');
           },

@@ -24,6 +24,8 @@ run `npm install`
 
 Copy `config.sample.json` to `config.json` and update it to match your setup. Add as many teams as you like by adding them to the array.
 
+If you are running another bridge that uses the default `slack` prefix, change the prefix now.  **You cannot change this value after the bridge has created rooms and ghost users.**
+
 ## register the app service
 
 Generate an `slack-registration.yaml` file with `node index.js -r -u "http://your-bridge-server:8090"`
