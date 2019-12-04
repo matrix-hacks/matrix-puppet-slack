@@ -1,4 +1,6 @@
-const path = require('path');
+const migrations = require('./config_migrations');
+migrations.run();
+
 const config = require('./config.json');
 const {
   MatrixAppServiceBridge: {
@@ -8,119 +10,113 @@ const {
 } = require("matrix-puppet-bridge");
 const puppet = new Puppet('./config.json');
 const debug = require('debug')('matrix-puppet:slack');
-const Promise = require('bluebird');
-const slackdown = require('./slackdown');
-const showdown  = require('showdown');
-const converter = new showdown.Converter();
 const App = require('./app');
 
 new Cli({
   port: config.port,
   registrationPath: config.registrationPath,
-  generateRegistration: function(reg, callback) {
-    puppet.associate().then(()=>{
+  generateRegistration: async function(reg, callback) {
+    try {
+      await puppet.associate();
       reg.setId(AppServiceRegistration.generateToken());
       reg.setHomeserverToken(AppServiceRegistration.generateToken());
       reg.setAppServiceToken(AppServiceRegistration.generateToken());
-      reg.setSenderLocalpart(`slack_bot`);
-      reg.addRegexPattern("users", `@slack_.*`, true);
-      reg.addRegexPattern("aliases", `#slack_.*`, false);
+      reg.setSenderLocalpart(`${config.prefix}_bot`);
+      reg.addRegexPattern("users", `@${config.prefix}_.*`, true);
+      reg.addRegexPattern("aliases", `#${config.prefix}_.*`, false);
       callback(reg);
-    }).catch(err=>{
-      console.error(err.message);
+    } catch (err) {
+      debug(err.message);
       process.exit(-1);
-    });
+    }
   },
-  run: function(port) {
+  run: async(port) => {
     let teamAppList = [];
 
     let matrixRoomAppMap = {};
 
     // KINDA BAD because you might have 2 accounts that are in the same room
     // although that would be silly, right?
-    const getAndCacheAppFromMatrixRoomId = (room_id) => {
-      return new Promise((resolve, reject) => {
-        let app = matrixRoomAppMap[room_id];
-        if (app) {
-          return resolve(app);
-        } else {
-          let ret = teamAppList.reduce((acc, app)=>{
-            if ( acc ) return acc;
-            let slackRoomId = app.getThirdPartyRoomIdFromMatrixRoomId(room_id);
-            let slackRoom = app.client.getRoomById(slackRoomId);
-            if (slackRoom) {
-              debug('getting app from slack room', slackRoom);
-              matrixRoomAppMap[room_id] = app;
-              return app;
-            }
-          }, null);
-          return ret ? resolve(ret) : reject(new Error('could not find slack team app for matrix room id', room_id));
+    const getAndCacheAppFromMatrixRoomId = async(room_id) => {
+      let app = matrixRoomAppMap[room_id];
+      if (app) {
+        return app;
+      }
+      for (const teamApp of teamAppList) {
+        let slackRoomId = teamApp.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+        let slackRoom = await teamApp.client.getRoomById(slackRoomId);
+        if (!slackRoom) {
+          continue;
         }
-      });
-    }
+        debug('getting app from slack room', slackRoom);
+        matrixRoomAppMap[room_id] = teamApp;
+        return teamApp;
+      }
+      throw new Error('could not find slack team app for matrix room id', room_id);
+    };
 
     const bridge = new Bridge(Object.assign({}, config.bridge, {
       controller: {
         onUserQuery: function(queriedUser) {
-          console.log('got user query', queriedUser);
+          debug('got user query', queriedUser);
           return {}; // auto provision users w no additional data
         },
-        onEvent: function(req, ctx) {
+        onEvent: async function(req, ctx) {
           const { room_id } = req.getData();
           debug('event in room id', room_id);
           if (room_id) {
-            getAndCacheAppFromMatrixRoomId(room_id).then( app => {
+            try {
+              const app = await getAndCacheAppFromMatrixRoomId(room_id);
               debug('got app from matrix room id');
               return app.handleMatrixEvent(req, ctx);
-            }).catch(err=>{
+            } catch (err) {
               debug('could not get app for matrix room id');
-              console.error(err);
-            });
+              debug(err);
+            }
           }
         },
         onAliasQuery: function() {
-          console.log('on alias query');
+          debug('on alias query');
         },
         thirdPartyLookup: {
-          protocols: config.slack.map(i=>`slack_${i.team_name}`),
+          protocols: config.slack.map(i=>`${config.prefix}_${i.team_name}`),
           getProtocol: function() {
-            console.log('get proto');
+            debug('get proto');
           },
           getLocation: function() {
-            console.log('get loc');
+            debug('get loc');
           },
           getUser: function() {
-            console.log('get user');
+            debug('get user');
           }
         }
       }
     }));
 
-    return bridge.run(port, config).then(()=>{
-      return puppet.startClient();
-    }).then(()=>{
-      return Promise.mapSeries(config.slack, (team) => {
+    try {
+      await bridge.run(port, config);
+      await puppet.startClient();
+      const apps = [];
+      for (const team of config.slack) {
         const app = new App(config, puppet, bridge);
         app.setSlackTeam(team.team_name, team.user_access_token, team.notify);
         debug('initing teams');
-        return app.initThirdPartyClient().then(() => {
+        try {
+          await app.initThirdPartyClient();
           debug('team success');
-          return app
-        }).catch(err=> {
+        } catch (err) {
           debug('team failure', err.message);
-          return app;
-        });
-      })
-    }).then((apps)=> {
+        }
+        apps.push(app);
+      }
       apps.map(a=>{
         debug('!!!! apps....', a.teamName);
       });
       teamAppList = apps;
-    }).then(()=>{
-      console.log('Matrix-side listening on port %s', port);
-    }).catch(err=>{
-      console.error(err.stack);
+      debug('Matrix-side listening on port %s', port);
+    } catch (err) {
+      debug(err.stack);
       process.exit(-1);
-    });
+    }
   }
 }).run();

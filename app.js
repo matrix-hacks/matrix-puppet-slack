@@ -6,6 +6,7 @@ const slackdown = require('./slackdown');
 const mxtoslack = require('./mxtoslack');
 const showdown  = require('showdown');
 const emojione = require('emojione')
+const { sleep } = require('./utils');
 const converter = new showdown.Converter({
   literalMidWordUnderscores : true,
   simpleLineBreaks: true
@@ -15,7 +16,7 @@ class App extends MatrixPuppetBridgeBase {
   setSlackTeam(teamName, userAccessToken, notify) {
     this.teamName = teamName;
     this.userAccessToken = userAccessToken;
-    this.slackPrefix = 'slack';
+    this.slackPrefix = config.prefix;
     this.servicePrefix = `${this.slackPrefix}_${this.teamName}`;
     this.notifyToSlack = notify;
     this.matrixRoomStatus = {};
@@ -26,40 +27,44 @@ class App extends MatrixPuppetBridgeBase {
   getServicePrefix() {
     return this.servicePrefix;
   }
-  sendStatus(_msg) {
-    let msg = `${this.teamName}: ${_msg}`
-    this.sendStatusMsg({
-      fixedWidthOutput: false,
-      roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-    }, msg).catch((err)=>{
-      console.log(err);
-    });
+  async sendStatus(_msg) {
+    const msg = `${this.teamName}: ${_msg}`
+    try {
+      await this.sendStatusMsg({
+        fixedWidthOutput: false,
+        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+      }, msg);
+    } catch (err) {
+      debug('could not send status message', err.message);
+    }
   }
-  initThirdPartyClient() {
+  async initThirdPartyClient() {
     this.client = new SlackClient(this.userAccessToken);
     this.client.on('unable-to-start', (err)=>{
       this.sendStatus(`unable to start: ${err.message}`);
     });
-    this.client.on('disconnected', ()=>{
-      this.sendStatus('disconnected. will try to reconnect in a minute...');
-      setTimeout(()=> {
-        this.initThirdPartyClient().catch((err)=>{
-          debug('reconnect failed with error', err.message);
-          this.sendStatus('reconnnect failed with error', err.message);
-        })
-      }, 60 * 1000);
+    this.client.on('disconnected', async()=>{
+      await this.sendStatus('disconnected. will try to reconnect in a minute...');
+      await sleep(60 * 1000);
+      try {
+        await this.initThirdPartyClient();
+      } catch (err) {
+        debug('reconnect failed with error', err.message);
+        await this.sendStatus('reconnnect failed with error', err.message);
+      }
     });
-    this.client.on('connected', (err)=>{
+    this.client.on('connected', ()=>{
       this.sendStatus(`connected`);
     });
-    return this.client.connect().then(()=>{
-      debug('waiting a little bit for initial self-messages to fire before listening for messages');
-      setTimeout(()=>this.registerMessageListener(), 5000);
-    })
+    await this.client.connect();
+    // XXX: need to wait?
+    debug('waiting a little bit for initial self-messages to fire before listening for messages');
+    await sleep(5000);
+    await this.registerMessageListener();
   }
   registerMessageListener() {
-    this.client.on('message', (data)=>{
-      console.log(data);
+    this.client.on('message', async(data)=>{
+      // console.log(data);
       // edit message
       if (data.subtype === "message_changed") {
         if (data.message.text === data.previous_message.text) {
@@ -67,15 +72,16 @@ class App extends MatrixPuppetBridgeBase {
           debug('ignoring duplicate edit', data);
           return;
         }
-        this.createAndSendPayload({
+        await this.createAndSendPayload({
           channel: data.channel,
           text: `Edit: ${data.message.text}`,
           user: data.message.user
         });
         return;
       }
+      // with files
       if (data.files) {
-        const promises = [];
+        let promises = [];
         if (data.text) {
           promises.push(this.createAndSendPayload({
             channel: data.channel,
@@ -86,7 +92,7 @@ class App extends MatrixPuppetBridgeBase {
             user_profile: data.user_profile,
           }));
         }
-        data.files.forEach((file) => {
+        const attachs = data.files.map(async(file) => {
           const d = {
             channel: data.channel,
             text: data.text,
@@ -96,32 +102,36 @@ class App extends MatrixPuppetBridgeBase {
             user_profile: data.user_profile,
             file: file,
           };
-          promises.push(this.sendFile(d).then(() => {
-            if (d.file.initial_comment) {
-              return this.createAndSendPayload({
-                channel: d.channel,
-                text: d.file.initial_comment.comment,
-                attachments: d.attachments,
-                bot_id: d.bot_id,
-                user: d.user,
-                user_profile: d.user_profile,
-              });
-            }
-          }));
-        });
-        Promise.all(promises).catch(err=>{
-          console.error(err);
-          this.sendStatusMsg({
-            fixedWidthOutput: true,
-            roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-          }, err.stack).catch((err)=>{
-            console.error(err);
+          await this.sendFile(d);
+          if (!d.file.initial_comment) {
+            return;
+          }
+          return await this.createAndSendPayload({
+            channel: d.channel,
+            text: d.file.initial_comment.comment,
+            attachments: d.attachments,
+            bot_id: d.bot_id,
+            user: d.user,
+            user_profile: d.user_profile,
           });
         });
+        promises = promises.concat(attachs);
+        try {
+          await Promise.all(promises);
+        } catch (err) {
+          try {
+            await this.sendStatusMsg({
+              fixedWidthOutput: true,
+              roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+            }, err.stack);
+          } catch (err) {
+            debug('could not send status message with error', err.message);
+          }
+        }
         return;
       }
       // normal message
-      this.createAndSendPayload({
+      await this.createAndSendPayload({
         channel: data.channel,
         text: data.text,
         attachments: data.attachments,
@@ -130,43 +140,41 @@ class App extends MatrixPuppetBridgeBase {
         user_profile: data.user_profile,
       });
     });
-    this.client.on('typing', (data)=>{
-      console.log(data);
-      this.createAndSendTypingEvent({
+
+    this.client.on('typing', async(data)=>{
+      // console.log(data);
+      await this.createAndSendTypingEvent({
         channel: data.channel,
         user: data.user,
       });
     });
-    this.client.on('rename', (data)=>{
-      console.log(data);
+    this.client.on('rename', async(data)=>{
+      // console.log(data);
       // rename channel
-      this.renameChannelEvent({
+      await this.renameChannelEvent({
         channel: data.channel,
       });
     });
     debug('registered message listener');
   }
-  getPayload(data) {
+  async getPayload(data) {
     const {
       channel,
-      text,
-      attachments,
       bot_id,
       user,
-      user_profile,
-      file,
     } = data;
+
     let payload = { roomId: channel };
 
     if (user) {
       if ( user === "USLACKBOT" ) {
-        const u = this.client.getUserById(user);
+        const u = await this.client.getUserById(user);
         payload.senderName = u.name;
         payload.senderId = user;
         payload.avatarUrl = u.profile.image_72;
       } else {
         const isMe = user === this.client.getSelfUserId();
-        let uu = this.client.getUserById(user);
+        let uu = await this.client.getUserById(user);
         payload.senderId = isMe ? undefined : user;
         if (uu) {
           payload.senderName = uu.name;
@@ -176,38 +184,35 @@ class App extends MatrixPuppetBridgeBase {
         }
       }
     } else if (bot_id) {
-      const bot = this.client.getBotById(bot_id);
+      const bot = await this.client.getBotById(bot_id);
       payload.senderName = bot.name;
       payload.senderId = bot_id;
       payload.avatarUrl = bot.icons.image_72
     }
     return payload;
   }
-  sendFile(data) {
-    let payload = this.getPayload(data);
+  async sendFile(data) {
+    let payload = await this.getPayload(data);
     payload.text = data.file.name;
     payload.url = ''; // to prevent errors
     payload.path = ''; // to prevent errors
-    return this.client.downloadImage(data.file.url_private).then(({ buffer, type }) => {
+    try {
+      const { buffer, type } = await this.client.downloadImage(data.file.url_private);
       payload.buffer = buffer;
       payload.mimetype = type;
-      return this.handleThirdPartyRoomMessageWithAttachment(payload);
-    }).catch((err) => {
-      console.log(err);
+      return await this.handleThirdPartyRoomMessageWithAttachment(payload);
+    } catch (err) {
+      debug('could not send the file data', err.message);
       payload.text = '[Image] ('+data.name+') '+data.url;
-      return this.handleThirdPartyRoomMessage(payload);
-    });
+      return await this.handleThirdPartyRoomMessage(payload);
+    }
   }
-  createAndSendPayload(data) {
+  async createAndSendPayload(data) {
     const {
-      channel,
       text,
       attachments,
-      bot_id,
-      user,
-      user_profile,
-      file,
     } = data;
+
     // any direct text
     let messages = [text];
     // any attachments, stuff it into the text as new lines
@@ -280,7 +285,7 @@ class App extends MatrixPuppetBridgeBase {
         .map(m => m.trim())
         .join('\n')
         .trim();
-    let payload = this.getPayload(data);
+    let payload = await this.getPayload(data);
 
     try {
       const replacements = [
@@ -305,9 +310,8 @@ class App extends MatrixPuppetBridgeBase {
         rawMessage = rawMessage.replace(replacements[i][0], replacements[i][1]);
       }
       rawMessage = emojione.shortnameToUnicode(rawMessage);
-      console.log("rawMessage");
-      console.log(rawMessage);
-      payload.text = slackdown(this, rawMessage);
+      debug('rawMessage', rawMessage);
+      payload.text = await slackdown(this, rawMessage);
       let markdown = payload.text;
       markdown = markdown.replace(/;BEGIN_FONT_COLOR_HACK_(.*?);/g, '<font color="$1">');
       markdown = markdown.replace(/;END_FONT_COLOR_HACK;/g, '</font>');
@@ -319,10 +323,10 @@ class App extends MatrixPuppetBridgeBase {
 
       let result = [];
       while ((result = /USER_MENTION_HACK(.*?)END_USER_MENTION_HACK/g.exec(payload.text)) !== null) {
-        console.log(result);
+        // console.log(result);
         const u = result[1];
         const isme = u === this.client.getSelfUserId();
-        const user = this.client.getUserById(u);
+        const user = await this.client.getUserById(u);
         if (user) {
             const id = isme ? config.puppet.id : this.getGhostUserFromThirdPartySenderId(u);
             // todo: update user profile
@@ -336,51 +340,51 @@ class App extends MatrixPuppetBridgeBase {
 
         }
       }
-      console.log("payload.text");
-      console.log(payload.text);
+      debug('payload.text', payload.text);
       payload.html = converter.makeHtml(markdown);
-      console.log("payload.html");
-      console.log(payload.html);
+      debug('payload.html', payload.html);
     } catch (e) {
-      console.log(e);
-      debug("could not normalize message", e);
+      debug("could not normalize message", e.message);
       payload.text = rawMessage;
     }
 
-
-
-    return this.handleThirdPartyRoomMessage(payload).catch(err=>{
-      console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
-        console.error(err);
-      });
-    });
+    try {
+      await this.handleThirdPartyRoomMessage(payload);
+    } catch (err) {
+      debug('could not send the message', err.message);
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
+        debug('could not send status message', err.message);
+      }
+    }
   }
-  createAndSendTypingEvent(data) {
-    const payload = this.getPayload(data);
-    return this.getIntentFromThirdPartySenderId(payload.senderId).then(ghostIntent => {
-      return this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId).then(matrixRoomId => {
-        // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
-        // client can get timeout value, but intent does not support this yet.
-        //return ghostIntent.sendTyping(matrixRoomId, true);
-        return ghostIntent._ensureJoined(matrixRoomId).then(function() {
-          return ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
-        }).then(function() {
-          return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
-        });
-      });
-    }).catch(err=>{
-      console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
-        console.error(err);
-      });
-    });
+
+  async createAndSendTypingEvent(data) {
+    const payload = await this.getPayload(data);
+    try {
+      const ghostIntent = await this.getIntentFromThirdPartySenderId(payload.senderId);
+      const matrixRoomId = await this.getOrCreateMatrixRoomFromThirdPartyRoomId(payload.roomId);
+      // HACK: copy from matrix-appservice-bridge/lib/components/indent.js
+      // client can get timeout value, but intent does not support this yet.
+      //return ghostIntent.sendTyping(matrixRoomId, true);
+      await ghostIntent._ensureJoined(matrixRoomId);
+      await ghostIntent._ensureHasPowerLevelFor(matrixRoomId, "m.typing");
+      return ghostIntent.client.sendTyping(matrixRoomId, true, 3000);
+    } catch (err) {
+      debug('could not send typing event', err.message);
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
+        debug('could not send status message', err.message);
+      }
+    }
   }
 
   async _renameChannelEvent(matrixRoomId, name) {
@@ -391,48 +395,53 @@ class App extends MatrixPuppetBridgeBase {
   }
 
   async renameChannelEvent(data) {
-    const payload = this.getPayload(data);
+    const payload = await this.getPayload(data);
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(payload.roomId);
     try {
       const room = await this.puppet.getClient().getRoomIdForAlias(roomAlias);
-      return this._renameChannelEvent(room.room_id, data.name);
+      return await this._renameChannelEvent(room.room_id, data.name);
     } catch (err) {
-      console.error(err);
-      this.sendStatusMsg({
-        fixedWidthOutput: true,
-        roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
-      }, err.stack).catch((err)=>{
-        console.error(err);
-      });
+      debug('could not send rename event', err.message);
+      try {
+        await this.sendStatusMsg({
+          fixedWidthOutput: true,
+          roomAliasLocalPart: `${this.slackPrefix}_${this.getStatusRoomPostfix()}`
+        }, err.stack);
+      } catch (err) {
+        debug('could not send status message', err.message);
+      }
     }
   }
-  getThirdPartyRoomDataById(id) {
-    const directName = (user) => this.client.getUserById(user).name;
+
+  async getThirdPartyRoomDataById(id) {
+    const directName = async(user) => (await this.client.getUserById(user)).name;
     const directTopic = () => `Slack Direct Message (Team: ${this.teamName})`
-    const room = this.client.getRoomById(id);
-    var purpose = "";
+    const room = await this.client.getRoomById(id);
+    let purpose = "";
     if ((room.purpose) && room.purpose.value) {
       purpose = room.purpose.value;
     }
     return {
-      name: room.isDirect ? directName(room.user) : room.name,
+      name: room.isDirect ? (await directName(room.user)) : room.name,
       topic: room.isDirect ? directTopic() : purpose
     }
   }
-  sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
+
+  async sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
     // not available for now
   }
-  sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
+
+  async sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
     debug('sending message as puppet to third party room with id', id);
     // text lost html informations, just use raw message instead that.
     let message;
     if (data.content.format === 'org.matrix.custom.html') {
       const rawMessage = data.content.formatted_body;
 
-      console.log("rawMessage");
-      console.log(rawMessage);
+      //console.log("rawMessage");
+      //console.log(rawMessage);
 
-      message = mxtoslack(this, rawMessage);
+      message = await mxtoslack(this, rawMessage);
     } else {
       message = data.content.body;
     }
@@ -445,13 +454,14 @@ class App extends MatrixPuppetBridgeBase {
     }
     // deduplicate
     message = this.tagMatrixMessage(message);
-
     return this.client.sendMessage(message, id);
   }
-  sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data, raw) {
+
+  async sendImageMessageAsPuppetToThirdPartyRoomWithId(id, data, raw) {
     return this.client.sendImageMessage(data.url, data.text, id);
   }
-  sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
+
+  async sendFileMessageAsPuppetToThirdPartyRoomWithId(id, data) {
     // deduplicate
     const filename = this.tagMatrixMessage(data.filename);
     return this.client.sendFileMessage(data.url, data.text, filename, id);
@@ -466,11 +476,18 @@ class App extends MatrixPuppetBridgeBase {
     const puppetClient = this.puppet.getClient();
     switch(type) {
       case 'name':
-        const roomName = await puppetClient.getStateEvent(matrixRoomId, 'm.room.name');
-        if (roomName && roomName.name) {
-          this.updateRoomStatesCache(matrixRoomId, 'name', roomName.name);
+        try {
+          const roomName = await puppetClient.getStateEvent(matrixRoomId, 'm.room.name');
+          if (roomName && roomName.name) {
+            this.updateRoomStatesCache(matrixRoomId, 'name', roomName.name);
+          }
+          return roomName.name;
+        } catch (e) {
+          if (e.errcode === 'M_NOT_FOUND') {
+            return;
+          }
+          throw e;
         }
-        return roomName.name;
       // TODO
     }
   }
@@ -485,12 +502,12 @@ class App extends MatrixPuppetBridgeBase {
   async getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId) {
     const matrixRoomId = await super.getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId);
     const name = await this.getRoomState(matrixRoomId, 'name');
-    const chan = this.client.getChannelById(thirdPartyRoomId) || {};
-    if (!chan.name) {
+    const data = await this.getThirdPartyRoomDataById(thirdPartyRoomId);
+    if (!data.name) {
       return matrixRoomId;
     }
-    if (name !== chan.name) {
-      await this._renameChannelEvent(matrixRoomId, chan.name);
+    if (name !== data.name) {
+      await this._renameChannelEvent(matrixRoomId, data.name);
     }
     return matrixRoomId;
   }
